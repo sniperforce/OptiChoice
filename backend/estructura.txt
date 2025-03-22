@@ -1,0 +1,42 @@
+mcdm_software/
+├── domain/                          # Capa de dominio (modelos puros)
+│   ├── entities/                    # Entidades básicas del dominio
+│   │   ├── alternative.py           # Clase para representar alternativas
+│   │   ├── criteria.py              # Clase para representar criterios
+│   │   ├── decision_matrix.py       # Matriz de decisión 
+│   │   ├── result.py                # Resultados de métodos MCDM
+│   │   └── project.py               # Proyecto completo de decisión
+│   └── repositories/                # Interfaces para repositorios (patrón Repository)
+│       ├── project_repository.py    # Interfaz para repositorio de proyectos
+│
+├── application/                     # Capa de aplicación (servicios y lógica de negocio)
+│   ├── services/                    # Servicios que implementan la lógica de negocio
+│   │   ├── project_service.py       # Servicios para gestión de proyectos
+│   │   ├── decision_service.py      # Servicios para el proceso de decisión
+│   ├── validators/                  # Validadores para todas las entidades
+│   │   ├── alternative_validator.py # Validador de alternativas
+│   │   ├── criteria_validator.py    # Validador de criterios
+│   │   ├── matrix_validator.py      # Validador de matrices de decisión
+│   │   └── project_validator.py     # Validador de proyectos
+│   └── methods/                     # Implementaciones de métodos MCDM (patrón Strategy)
+│       ├── method_factory.py        # Fábrica para crear instancias de métodos
+│       ├── method_interface.py      # Interfaz común para todos los métodos
+│       ├── topsis.py                # Implementación de TOPSIS
+│       ├── ahp.py                   # Implementación de AHP
+│       ├── promethee.py             # Implementación de PROMETHEE
+│       └── electre.py               # Implementación de ELECTRE
+│
+├── infrastructure/                  # Capa de infraestructura
+│   ├── persistence/                 # Implementaciones concretas de persistencia
+│   │   └── file_project_repository.py  # Implementación basada en archivos
+│
+├── presentation/                    # Capa de presentación (controladores y vistas)
+│   ├── controllers/                 # Controladores (MVC)
+│   │   └── main_controller.py       # Controlador principal (en proceso)
+│
+├── utils/                           # Utilidades generales
+│   ├── exceptions.py                # Excepciones personalizadas
+│   └── normalization.py             # Funciones de normalización
+│
+├── main.py                          # Punto de entrada principal (pendiente)
+└── config.py                        # Configuración general (pendiente)
