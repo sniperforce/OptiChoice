@@ -39,7 +39,7 @@ class MCDMMethodInterface(ABC):
 
     def _prepare_execution(self, decision_matrix: DecisionMatrix,
                            parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        effective_params = self.get_default_parameters
+        effective_params = self.get_default_parameters()
         if parameters:
             effective_params.update(parameters)
         

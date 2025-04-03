@@ -1,0 +1,26 @@
+===== RESULTADOS DE VALIDACIÓN AHP: SELECCIÓN DE PROVEEDORES =====
+
+Referencia científica: Handfield, R., Walton, S.V., Sroufe, R., & Melnyk, S.A. (2002). Applying environmental criteria to supplier assessment: A study in the application of the Analytical Hierarchy Process. European Journal of Operational Research, 141(1), 70-87.
+
+Pesos de los criterios:
+Calidad: 0.3763
+Capacidad de respuesta: 0.2148
+Precio: 0.1207
+Desempeño ambiental: 0.0735
+Capacidad técnica: 0.2148
+
+Puntuaciones de las alternativas:
+Proveedor A: 7.6524
+Proveedor B: 6.9941
+Proveedor C: 7.1410
+Proveedor D: 6.5031
+
+Ranking final:
+1. Proveedor A (Score: 7.6524)
+2. Proveedor C (Score: 7.1410)
+3. Proveedor B (Score: 6.9941)
+4. Proveedor D (Score: 6.5031)
+
+Índice de Consistencia: 0.0068
+Ratio de Consistencia: 0.0061
+¿Es consistente? True

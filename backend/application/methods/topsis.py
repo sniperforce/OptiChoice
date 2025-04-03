@@ -59,7 +59,7 @@ class TOPSISMethod(MCDMMethodInterface):
     
     def validate_parameters(self, parameters: Dict[str, Any]) -> bool:
         if 'normalization_method' in parameters:
-            if parameters['normalization_method'] not in ['minmax', 'sum', 'max', 'vector']:
+            if parameters['normalization_method'] not in ['minimax', 'sum', 'max', 'vector']:
                 return False
         
         if 'normalize_matrix' in parameters:
@@ -85,7 +85,7 @@ class TOPSISMethod(MCDMMethodInterface):
         try:
             params = self._prepare_execution(decision_matrix, parameters)
             
-            alternatives = decision_matrix.alternatives
+            alternatives = decision_matrix.alternative
             criteria = decision_matrix.criteria
             values = decision_matrix.values.copy()
             

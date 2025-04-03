@@ -20,7 +20,7 @@ def normalize_matrix(values: np.ndarray, criteria: List[Criteria],
     normalized = values.copy()
 
     #Apply the corresponding method
-    if method == 'minmax':
+    if method == 'minimax':
         normalized = normalize_minmax(normalized, criteria)
     elif method == 'sum':
         normalized = normalize_sum(normalized, criteria)

@@ -1,0 +1,21 @@
+===== RESULTADOS DE VALIDACIÓN TOPSIS: PROYECTOS DE ENERGÍA RENOVABLE =====
+
+Referencia científica: Ren, J., Manzardo, A., Toniolo, S., & Scipioni, A. (2015). Sustainability assessment of alternative biodiesel technologies using TOPSIS method with different weighting strategies. Energy Conversion and Management, 104, 352-364.
+
+Puntuaciones de proximidad relativa (Ci):
+Parque Eólico: 0.4668
+Planta Solar Fotovoltaica: 0.3105
+Planta Hidroeléctrica: 0.7972
+Planta de Biomasa: 0.5272
+Planta Geotérmica: 0.6094
+
+Ranking final:
+1. Planta Hidroeléctrica (Score: 0.7972)
+2. Planta Geotérmica (Score: 0.6094)
+3. Planta de Biomasa (Score: 0.5272)
+4. Parque Eólico (Score: 0.4668)
+5. Planta Solar Fotovoltaica (Score: 0.3105)
+
+Detalles del cálculo TOPSIS:
+Solución ideal positiva: [-0.13456576617164245, 0.10170267618619651, 0.10231567610457681, 0.08160244811016551, -0.11566693386808387]
+Solución ideal negativa: [-0.08498890495051102, 0.07627700713964738, 0.06821045073638454, 0.05100153006885345, -0.04957154308632166]

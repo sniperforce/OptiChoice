@@ -57,7 +57,7 @@ class ELECTREMethod(MCDMMethodInterface):
             'variant': 'I',
             'concordance_threshold': 0.7, # between 0.5 and 1.0
             'discordance_threshold': 0.3, # between 0.0 and 1.0
-            'normalization_method': 'minmax',
+            'normalization_method': 'minimax',
             'normalize_matrix': True,
             'preference_threshold': None,   # For ELECTRE III: preference thresholds by criterian (indifference < preference)
             'indifference_threshold': None, # For ELECTRE III: indifference thresholds by criterion
@@ -88,7 +88,7 @@ class ELECTREMethod(MCDMMethodInterface):
             
         if 'normalization_method' in parameters:
             method = parameters['normalization_method']
-            if method not in ['minmax', 'sum', 'max', 'vector']:
+            if method not in ['minimax', 'sum', 'max', 'vector']:
                 return False
         
         if 'normalize_matrix' in parameters:
@@ -195,7 +195,7 @@ class ELECTREMethod(MCDMMethodInterface):
                 metadata=metadata
             )
 
-            return Result
+            return result
         except ValidationError as e:
             raise e
         except Exception as e:

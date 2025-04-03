@@ -28,7 +28,7 @@ class PROMETHEEMethod(MCDMMethodInterface):
     with multiple preference functions available.
     """
 
-    PREFRENCE_FUNCTIONS = {
+    PREFERENCE_FUNCTIONS = {
         "usual": 1,
         "u-shape": 2,
         "v-shape": 3,
@@ -74,11 +74,11 @@ class PROMETHEEMethod(MCDMMethodInterface):
             
             # s parameters (gaussian) by criterion
             's_thresholds': None,
-            'normalization_method': 'minmax',
+            'normalization_method': 'minimax',
             'normalize_matrix': True
         }
     
-    def validatete_parameters(self, parameters: Dict[str, Any]) -> bool:
+    def validate_parameters(self, parameters: Dict[str, Any]) -> bool:
         if 'variant' in parameters:
             if parameters['variant'] not in ['I', 'II']:
                 return False
@@ -116,7 +116,7 @@ class PROMETHEEMethod(MCDMMethodInterface):
                     return False
 
         if 'normalization_method' in parameters:
-            if parameters['normalization_method'] not in ['minmax', 'sum', 'max', 'vector']:
+            if parameters['normalization_method'] not in ['minimax', 'sum', 'max', 'vector']:
                 return False
 
         if 'normalize_matrix' in parameters:

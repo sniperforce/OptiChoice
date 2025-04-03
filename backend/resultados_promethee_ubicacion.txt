@@ -1,0 +1,26 @@
+===== RESULTADOS DE VALIDACIÓN PROMETHEE: SELECCIÓN DE UBICACIÓN INDUSTRIAL =====
+
+Referencia científica: Behzadian, M., Kazemzadeh, R. B., Albadvi, A., & Aghdasi, M. (2010). PROMETHEE: A comprehensive literature review on methodologies and applications. European Journal of Operational Research, 200(1), 198-215.
+
+Puntuaciones finales (Phi neto):
+Ubicación Industrial A: -0.0875
+Ubicación Industrial B: 0.1000
+Ubicación Industrial C: -0.0875
+Ubicación Industrial D: 0.2250
+Ubicación Industrial E: -0.1500
+
+Ranking final:
+1. Ubicación Industrial D (Score: 0.2250)
+2. Ubicación Industrial B (Score: 0.1000)
+3. Ubicación Industrial C (Score: -0.0875)
+4. Ubicación Industrial A (Score: -0.0875)
+5. Ubicación Industrial E (Score: -0.1500)
+
+Flujos de Preferencia:
+Alternativa | Phi+ (Salida) | Phi- (Entrada) | Phi (Neto)
+------------------------------------------------------------
+Ubicación Industrial A: 0.0312 | 0.1188 | -0.0875
+Ubicación Industrial B: 0.1437 | 0.0437 | 0.1000
+Ubicación Industrial C: 0.0312 | 0.1188 | -0.0875
+Ubicación Industrial D: 0.2437 | 0.0187 | 0.2250
+Ubicación Industrial E: 0.0750 | 0.2250 | -0.1500

@@ -1,7 +1,7 @@
-from ..domain.entities.alternative import Alternative
-from ..domain.entities.criteria import Criteria, OptimizationType
-from ..domain.entities.decision_matrix import DecisionMatrix
-from ..application.methods.ahp import AHPMethod
+from domain.entities.alternative import Alternative
+from domain.entities.criteria import Criteria, OptimizationType
+from domain.entities.decision_matrix import DecisionMatrix
+from application.methods.ahp import AHPMethod
 import numpy as np
 
 # 1. Crear alternativas
@@ -50,7 +50,7 @@ parametros = {
     'use_pairwise_comparison_for_alternatives': False,  # Usar valores directos
     'show_consistency_details': True,
     'normalize_before_comparison': True,
-    'normalization_method': 'minmax'
+    'normalization_method': 'minimax'
 }
 
 # 6. Ejecutar el método AHP

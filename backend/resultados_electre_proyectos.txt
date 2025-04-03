@@ -1,0 +1,29 @@
+===== RESULTADOS DE VALIDACIÓN ELECTRE: SELECCIÓN DE PROYECTOS DE INVERSIÓN =====
+
+Referencia científica: Figueira, J., Greco, S., & Ehrgott, M. (2005). Multiple Criteria Decision Analysis: State of the Art Surveys. Springer Science & Business Media.
+
+Puntuaciones de las alternativas:
+Proyecto 1: 0.5000
+Proyecto 2: -0.7500
+Proyecto 3: 0.5000
+Proyecto 4: 0.5000
+Proyecto 5: -0.7500
+
+Ranking final:
+1. Proyecto 4 (Score: 0.5000)
+2. Proyecto 1 (Score: 0.5000)
+3. Proyecto 3 (Score: 0.5000)
+4. Proyecto 5 (Score: -0.7500)
+5. Proyecto 2 (Score: -0.7500)
+
+Matriz de Superación (Outranking):
+Proyecto 1: [0.0, 1.0, 0.0, 0.0, 1.0]
+Proyecto 2: [0.0, 0.0, 0.0, 0.0, 1.0]
+Proyecto 3: [0.0, 1.0, 0.0, 0.0, 1.0]
+Proyecto 4: [0.0, 1.0, 0.0, 0.0, 1.0]
+Proyecto 5: [0.0, 1.0, 0.0, 0.0, 0.0]
+
+Alternativas no dominadas (kernel):
+- Proyecto 1
+- Proyecto 3
+- Proyecto 4

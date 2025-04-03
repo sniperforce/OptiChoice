@@ -96,8 +96,8 @@ class AHPMethod(MCDMMethodInterface):
             # If True, normalize the values before generate automatic comparition matrix
             'normalize_before_comparison': True,
 
-            # Normalization method ('minmax', 'sum', 'max', 'vector')
-            'normalization_method': 'minmax'
+            # Normalization method ('minimax', 'sum', 'max', 'vector')
+            'normalization_method': 'minimax'
         }
     
     def validate_parameters(self, parameters: Dict[str, Any]) -> bool:
@@ -200,7 +200,7 @@ class AHPMethod(MCDMMethodInterface):
 
             result = Result(
                 method_name=self.name,
-                alternatives_ids=[alt.id for alt in alternatives],
+                alternative_ids=[alt.id for alt in alternatives],
                 alternative_names=[alt.name for alt in alternatives],
                 scores=scores,
                 parameters=params,
