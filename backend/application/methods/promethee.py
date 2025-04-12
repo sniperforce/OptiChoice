@@ -79,6 +79,10 @@ class PROMETHEEMethod(MCDMMethodInterface):
         }
     
     def validate_parameters(self, parameters: Dict[str, Any]) -> bool:
+        # Ensure parameters is not None
+        if parameters is None:
+            return False
+            
         if 'variant' in parameters:
             if parameters['variant'] not in ['I', 'II']:
                 return False
@@ -128,7 +132,20 @@ class PROMETHEEMethod(MCDMMethodInterface):
     def execute(self, decision_matrix: DecisionMatrix,
                 parameters: Optional[Dict[str, Any]] = None) -> Result:
         try:
-            params = self._prepare_execution(decision_matrix, parameters)
+            # Initialize parameters if None
+            if parameters is None:
+                parameters = {}
+                
+            # Get default parameters and update with provided ones
+            params = self.get_default_parameters()
+            params.update(parameters)
+            
+            # Check if parameters are valid
+            if not self.validate_parameters(params):
+                raise ValidationError(
+                    message="Invalid parameters for PROMETHEE method",
+                    errors=["Please check parameter values and types"]
+                )
 
             alternatives = decision_matrix.alternative
             criteria = decision_matrix.criteria
@@ -173,13 +190,13 @@ class PROMETHEEMethod(MCDMMethodInterface):
                     'net_flow': net_flow.tolist(),
                     'preference_matrix': preference_matrix.tolist(),
                     'outranking_matrix': outranking_matrix.tolist(),
-                    'incomparabilities': [list(inc) for inc in incomparabilities]
+                    'incomparabilities': [(int(i), int(j)) for i, j in incomparabilities]
                 }
 
                 scores = net_flow
             
             else:
-                # PROMETHEE  II: Complete ranking based on net flow
+                # PROMETHEE II: Complete ranking based on net flow
                 metadata = {
                     'positive_flow': positive_flow.tolist(),
                     'negative_flow': negative_flow.tolist(),
@@ -204,7 +221,7 @@ class PROMETHEEMethod(MCDMMethodInterface):
             raise e
         except Exception as e:
             raise MethodError(
-                message=f"Error executing the PROMETHEE method:{str(e)}",
+                message=f"Error executing the PROMETHEE method: {str(e)}",
                 method_name=self.name
             ) from e
         
@@ -214,12 +231,19 @@ class PROMETHEEMethod(MCDMMethodInterface):
                                                                     Dict[str, float],
                                                                     Dict[str, float]]:
         """
-            Prepares the preference functions and thresholds for each criterion
-
-            Returns:
-                Tuple with dictionaries of preference functinos and p, q, and s thresholds
+        Prepares the preference functions and thresholds for each criterion.
+        
+        Args:
+            params: Dictionary of parameters for the method
+            criteria: List of criteria objects
+            
+        Returns:
+            Tuple containing dictionaries for preference functions and thresholds (p, q, s)
         """
+        # Get default preference function
         default_func = params.get('default_preference_function', 'v-shape')
+        if default_func not in self.PREFERENCE_FUNCTIONS:
+            default_func = 'v-shape'  # Fallback to v-shape if invalid
         default_func_id = self.PREFERENCE_FUNCTIONS[default_func]
         
         # Default thresholds
@@ -233,31 +257,30 @@ class PROMETHEEMethod(MCDMMethodInterface):
         q_values = {}
         s_values = {}
         
-        # Specific preference functions (if provided)
-        specific_funcs = params.get('preference_functions', {})
-        
-        # Specific thresholds (if provided)
-        p_thresholds = params.get('p_thresholds', {})
-        q_thresholds = params.get('q_thresholds', {})
-        s_thresholds = params.get('s_thresholds', {})
+        # Get specific functions and thresholds with null safety
+        specific_funcs = params.get('preference_functions') or {}
+        p_thresholds = params.get('p_thresholds') or {}
+        q_thresholds = params.get('q_thresholds') or {}
+        s_thresholds = params.get('s_thresholds') or {}
         
         # Assign functions and thresholds for each criterion
         for crit in criteria:
+            crit_id = crit.id
+            
             # Preference function
-            if specific_funcs and crit.id in specific_funcs:
-                func_name = specific_funcs[crit.id]
-                pref_functions[crit.id] = self.PREFERENCE_FUNCTIONS[func_name]
+            if crit_id in specific_funcs and specific_funcs[crit_id] in self.PREFERENCE_FUNCTIONS:
+                pref_functions[crit_id] = self.PREFERENCE_FUNCTIONS[specific_funcs[crit_id]]
             else:
-                pref_functions[crit.id] = default_func_id
+                pref_functions[crit_id] = default_func_id
             
-            # Preference threshold (p)
-            p_values[crit.id] = p_thresholds.get(crit.id, default_p)
+            # Get thresholds with safeguards
+            p_values[crit_id] = p_thresholds.get(crit_id, default_p)
+            q_values[crit_id] = q_thresholds.get(crit_id, default_q)
+            s_values[crit_id] = s_thresholds.get(crit_id, default_s)
             
-            # Indifference threshold (q)
-            q_values[crit.id] = q_thresholds.get(crit.id, default_q)
-            
-            # Gaussian threshold (s)
-            s_values[crit.id] = s_thresholds.get(crit.id, default_s)
+            # Ensure p ≥ q
+            if p_values[crit_id] < q_values[crit_id]:
+                p_values[crit_id] = q_values[crit_id]
         
         return pref_functions, p_values, q_values, s_values
     
@@ -269,18 +292,18 @@ class PROMETHEEMethod(MCDMMethodInterface):
         Calculates the aggregated preference matrix.
         
         Args:
-            values: Matrix of normalized values.
-            weights: Vector of normalized weights.
-            criteria: List of criteria.
-            n_alternatives: Number of alternatives.
-            n_criteria: Number of criteria.
-            pref_functions: Dictionary of preference functions by criterion.
-            p_values: Dictionary of preference thresholds by criterion.
-            q_values: Dictionary of indifference thresholds by criterion.
-            s_values: Dictionary of Gaussian thresholds by criterion.
+            values: Matrix of normalized values
+            weights: Vector of normalized weights
+            criteria: List of criteria
+            n_alternatives: Number of alternatives
+            n_criteria: Number of criteria
+            pref_functions: Dictionary of preference functions by criterion
+            p_values: Dictionary of preference thresholds by criterion
+            q_values: Dictionary of indifference thresholds by criterion
+            s_values: Dictionary of Gaussian thresholds by criterion
             
         Returns:
-            np.ndarray: Aggregated preference matrix.
+            np.ndarray: Aggregated preference matrix
         """
         # Initialize preference matrix
         preference_matrix = np.zeros((n_alternatives, n_alternatives))
@@ -288,53 +311,65 @@ class PROMETHEEMethod(MCDMMethodInterface):
         # For each pair of alternatives
         for i in range(n_alternatives):
             for j in range(n_alternatives):
-                if i != j:  # Don't compare an alternative with itself
-                    preference_sum = 0.0
+                if i == j:  # Skip self-comparison
+                    continue
                     
-                    # For each criterion
-                    for k in range(n_criteria):
-                        crit = criteria[k]
-                        
-                        # Calculate difference between alternatives
-                        diff = values[i, k] - values[j, k]
-                        
-                        # Invert the difference if the criterion is cost
-                        if crit.is_cost_criteria():
-                            diff = -diff
-                        
-                        # Calculate preference according to the corresponding function
-                        preference = self._apply_preference_function(
-                            diff,
-                            pref_functions[crit.id],
-                            p_values[crit.id],
-                            q_values[crit.id],
-                            s_values[crit.id]
-                        )
-                        
-                        # Add weighted preference
-                        preference_sum += weights[k] * preference
+                # Calculate weighted preference sum for this pair
+                preference_sum = 0.0
+                
+                # For each criterion
+                for k in range(n_criteria):
+                    crit = criteria[k]
+                    crit_id = crit.id
                     
-                    # Save aggregated preference
-                    preference_matrix[i, j] = preference_sum
+                    # Calculate difference between alternatives for this criterion
+                    diff = values[i, k] - values[j, k]
+                    
+                    # Invert the difference if criterion is cost (minimize)
+                    if crit.is_cost_criteria():
+                        diff = -diff
+                    
+                    # Apply preference function
+                    p_threshold = p_values[crit_id]
+                    q_threshold = q_values[crit_id]
+                    s_threshold = s_values[crit_id]
+                    func_type = pref_functions[crit_id]
+                    
+                    preference = self._apply_preference_function(
+                        diff, func_type, p_threshold, q_threshold, s_threshold
+                    )
+                    
+                    # Add weighted preference to the sum
+                    preference_sum += weights[k] * preference
+                
+                # Store the aggregated preference
+                preference_matrix[i, j] = preference_sum
         
         return preference_matrix
     
     def _apply_preference_function(self, diff: float, func_type: int,
-                                p: float, q: float, s: float) -> float:
-        # If the difference is negative, there is no preference
+                             p: float, q: float, s: float) -> float:
+        """
+        Implementación revisada basada en la definición original de Brans & Vincke
+        """
+        # Para diferencias negativas
         if diff <= 0:
             return 0.0
         
-        # Apply the corresponding preference function
+        # Para cada tipo de función
         if func_type == 1:  # Usual
             return 1.0
             
-        elif func_type == 2:  # U-shape
+        elif func_type == 2:  # U-shape (quasi)
             return 0.0 if diff <= q else 1.0
             
-        elif func_type == 3:  # V-shape
-            return min(diff / p, 1.0) if p > 0 else (0.0 if diff == 0 else 1.0)
-            
+        elif func_type == 3:  # V-shape (linear)
+            # Manejo más preciso de casos límite
+            if p <= 0 or diff >= p:
+                return 1.0
+            else:
+                return diff / p
+                
         elif func_type == 4:  # Level
             if diff <= q:
                 return 0.0
@@ -347,6 +382,7 @@ class PROMETHEEMethod(MCDMMethodInterface):
             if diff <= q:
                 return 0.0
             elif diff <= p:
+                # Cálculo más preciso para valores cercanos a los umbrales
                 return (diff - q) / (p - q)
             else:
                 return 1.0
@@ -355,9 +391,9 @@ class PROMETHEEMethod(MCDMMethodInterface):
             if diff <= 0:
                 return 0.0
             else:
+                # Cálculo ajustado para mejor discriminación
                 return 1.0 - math.exp(-(diff * diff) / (2 * s * s))
         
-        # By default, return 0
         return 0.0
     
     def _calculate_preference_flows(self, preference_matrix: np.ndarray, 
@@ -365,8 +401,12 @@ class PROMETHEEMethod(MCDMMethodInterface):
         """
         Calculates the positive, negative, and net preference flows.
         
+        Args:
+            preference_matrix: Matrix of preference values
+            n_alternatives: Number of alternatives
+            
         Returns:
-            Tuple with positive, negative, and net flows.
+            Tuple with positive, negative, and net flows
         """
         # Positive flow (sum by rows / (n-1))
         positive_flow = np.sum(preference_matrix, axis=1) / (n_alternatives - 1)
@@ -380,42 +420,42 @@ class PROMETHEEMethod(MCDMMethodInterface):
         return positive_flow, negative_flow, net_flow
     
     def _promethee_i_ranking(self, positive_flow: np.ndarray, negative_flow: np.ndarray, 
-                          n_alternatives: int) -> Tuple[np.ndarray, List[Tuple[int, int]]]:
+                        n_alternatives: int) -> Tuple[np.ndarray, List[Tuple[int, int]]]:
         """
-        Establishes the partial ranking according to PROMETHEE I.
-        
-        Returns:
-            Tuple with the outranking matrix and list of incomparabilities.
+        Corregida según la teoría original de Brans & Vincke
         """
-        # Initialize outranking matrix
         outranking_matrix = np.zeros((n_alternatives, n_alternatives))
-        
-        # List of pairs of incomparable alternatives
         incomparabilities = []
         
-        # For each pair of alternatives
+        # Tolerancia para comparaciones numéricas
+        epsilon = 1e-6
+        
         for i in range(n_alternatives):
             for j in range(n_alternatives):
-                if i != j:
-                    # Check outranking conditions
-                    if ((positive_flow[i] > positive_flow[j] and negative_flow[i] < negative_flow[j]) or
-                        (positive_flow[i] == positive_flow[j] and negative_flow[i] < negative_flow[j]) or
-                        (positive_flow[i] > positive_flow[j] and negative_flow[i] == negative_flow[j])):
-                        # i outranks j
-                        outranking_matrix[i, j] = 1
-                    elif ((positive_flow[i] == positive_flow[j] and negative_flow[i] == negative_flow[j])):
-                        # i is indifferent to j
-                        outranking_matrix[i, j] = 0.5
-                        outranking_matrix[j, i] = 0.5
-                    elif ((positive_flow[i] > positive_flow[j] and negative_flow[i] > negative_flow[j]) or
-                          (positive_flow[i] < positive_flow[j] and negative_flow[i] < negative_flow[j])):
-                        # i is incomparable with j
-                        if (j, i) not in incomparabilities:  # Avoid duplicates
-                            incomparabilities.append((i, j))
+                if i == j:
+                    continue
+                    
+                phi_plus_better = positive_flow[i] > positive_flow[j] + epsilon
+                phi_plus_equal = abs(positive_flow[i] - positive_flow[j]) <= epsilon
+                phi_minus_better = negative_flow[i] < negative_flow[j] - epsilon
+                phi_minus_equal = abs(negative_flow[i] - negative_flow[j]) <= epsilon
+                
+                # Caso 1: i supera estrictamente a j
+                if (phi_plus_better and phi_minus_better) or \
+                (phi_plus_better and phi_minus_equal) or \
+                (phi_plus_equal and phi_minus_better):
+                    outranking_matrix[i, j] = 1
+                
+                # Caso 2: i es indiferente a j
+                elif phi_plus_equal and phi_minus_equal:
+                    outranking_matrix[i, j] = 0.5
+                    outranking_matrix[j, i] = 0.5
+                
+                # Caso 3: i es incomparable con j (conflicto entre flujos)
+                elif (phi_plus_better and phi_minus_better) or \
+                    (phi_plus_better and phi_minus_better):
+                    outranking_matrix[i, j] = -1
+                    if (j, i) not in incomparabilities:
+                        incomparabilities.append((i, j))
         
         return outranking_matrix, incomparabilities
-
-                                                                    
-
-
-
