@@ -5,17 +5,11 @@
     documentados en la literatura científica para validar la implementación
 """
 
-import os
-import sys
-import numpy as np
-
-# Añadir el directorio raíz del proyecto al path de Python
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
 from domain.entities.alternative import Alternative
 from domain.entities.criteria import Criteria, OptimizationType, ScaleType
 from domain.entities.decision_matrix import DecisionMatrix
 from application.methods.promethee import PROMETHEEMethod
+import numpy as np
 
 def ejecutar_validacion_promethee_i_brans():
     """

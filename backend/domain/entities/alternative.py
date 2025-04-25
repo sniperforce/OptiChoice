@@ -58,10 +58,10 @@ class Alternative:
     @classmethod
     def from_dict(cls, data):
         return cls(
-            _id=data['id'],
-            _name=data['name'],
-            _description=data.get('description', ''),
-            _metadata=data.get('metadata', {})
+            id=data['id'],
+            name=data['name'],
+            description=data.get('description', ''),
+            metadata=data.get('metadata', {})
         )
     
         

@@ -42,7 +42,7 @@ class Criteria:
     
     @name.setter
     def name(self, value):
-        self.name = value
+        self._name = value
     
     @property
     def description(self):
@@ -50,7 +50,7 @@ class Criteria:
     
     @description.setter
     def description(self, value):
-        self.description = value or ""
+        self._description = value or ""
     
     @property
     def optimization_type(self):
@@ -66,8 +66,8 @@ class Criteria:
         return self._scale_type
     
     @scale_type.setter
-    def scale_tpye(self, value):
-        self.sclaetype = value
+    def scale_type(self, value):
+        self._scale_type = value
     
     @property
     def weight(self):
@@ -87,7 +87,7 @@ class Criteria:
 
     @property
     def metadata(self):
-        return self._metadata
+        return self._metadata.copy()
     
     def set_metadata(self, key, value):
         self._metadata[key] = value
@@ -102,7 +102,7 @@ class Criteria:
         return self._optimization_type == OptimizationType.MINIMIZE
     
     def __str__(self):
-        return f"{self.name} ({self._optimization_type.value}, peso: {self._weight})"
+        return f"{self._name} ({self._optimization_type.value}, peso: {self._weight})"
     
     def __repr__(self):
         return (f"Criteria(id='{self._id}', name='{self._name}',"
@@ -120,6 +120,7 @@ class Criteria:
             'metadata': self._metadata
         }
     
+    @classmethod
     def from_dict(cls, data):
         opt_type = data.get('optimization_type', OptimizationType.MAXIMIZE.value)
         if isinstance(opt_type, str):

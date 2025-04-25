@@ -60,13 +60,18 @@ class ProjectValidator:
     def validate_alternatives(alternatives: List[Alternative]) -> Tuple[bool, List[str]]:
         errors = []
         
+        if len(alternatives) == 0:
+            errors.append("Alternatives list cannot be empty")
+            return False, errors
+
         if not isinstance(alternatives, list):
             errors.append("Alternatives must be in a list")
             return False, errors
             
         if not all(isinstance(alt, Alternative) for alt in alternatives):
             errors.append("All elements must be instances of Alternative")
-            
+            return False, errors
+
         alt_ids = [alt.id for alt in alternatives]
         unique_ids = set(alt_ids)
         if len(alt_ids) != len(unique_ids):
@@ -88,12 +93,17 @@ class ProjectValidator:
     def validate_criteria(criteria: List[Criteria]) -> Tuple[bool, List[str]]:
         errors = []
         
+        if len(criteria) == 0:
+            errors.append("Criteria list cannot be empty")
+            return False, errors
+
         if not isinstance(criteria, list):
             errors.append("Criteria must be in a list")
             return False, errors
             
         if not all(isinstance(crit, Criteria) for crit in criteria):
             errors.append("All elements must be instances of Criteria")
+            return False, errors
             
         crit_ids = [crit.id for crit in criteria]
         unique_ids = set(crit_ids)
@@ -135,7 +145,7 @@ class ProjectValidator:
         if not matrix_valid:
             errors.extend(matrix_errors)
         
-        matrix_alt_ids = {alt.id for alt in matrix.alternatives}
+        matrix_alt_ids = {alt.id for alt in matrix.alternative}
         project_alt_ids = {alt.id for alt in alternatives}
         if not matrix_alt_ids.issubset(project_alt_ids):
             missing_alts = matrix_alt_ids - project_alt_ids

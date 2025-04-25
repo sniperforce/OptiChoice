@@ -9,6 +9,9 @@ import json
 import pandas as pd
 import csv
 
+import csv
+from domain.entities.alternative import Alternative
+from domain.entities.criteria import Criteria, OptimizationType, ScaleType
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from domain.entities.project import Project
@@ -134,7 +137,8 @@ class ProjectService:
             
             project_dict = original.to_dict()
         
-            project_dict.pop('id')
+            if 'id' in project_dict:
+                project_dict.pop('id')
             
             if new_name:
                 project_dict['name'] = new_name
@@ -142,6 +146,9 @@ class ProjectService:
                 project_dict['name'] = f"Copy of {project_dict['name']}"
             
             new_project = Project.from_dict(project_dict)
+            
+            # Asegurarse de que el nombre se establece correctamente
+            new_project.name = project_dict['name']
             
             saved_project = self.save_project(new_project)
             
@@ -162,7 +169,7 @@ class ProjectService:
         try:
             wb = Workbook()
 
-            ws_info = wb.active()
+            ws_info = wb.active
             ws_info.title = "Project Information"
 
             ws_info.append(["ID", project.id])
@@ -290,7 +297,7 @@ class ProjectService:
                     writer.writerow(headers)
                     
                     # Data
-                    for i, alt in enumerate(matrix.alternatives):
+                    for i, alt in enumerate(matrix.alternative):
                         row = [alt.name]
                         for j in range(len(matrix.criteria)):
                             row.append(float(matrix.values[i, j]))
@@ -413,7 +420,7 @@ class ProjectService:
                 matrix_data = [headers]
                 
                 # Data
-                for i, alt in enumerate(matrix.alternatives):
+                for i, alt in enumerate(matrix.alternative):
                     row = [alt.name]
                     for j in range(len(matrix.criteria)):
                         row.append(f"{float(matrix.values[i, j]):.4f}")
@@ -624,7 +631,7 @@ class ProjectService:
                                 alt_row = df_matrix[df_matrix.iloc[:, 0] == alt.name]
                                 if not alt_row.empty:
                                     value = float(alt_row.iloc[0, j + 1])
-                                    matrix.set_value(i, j, value)
+                                    matrix.set_values(i, j, value)
                             except (IndexError, ValueError):
                                 # If there's an error, leave default value (0)
                                 pass
@@ -644,11 +651,7 @@ class ProjectService:
 
     def import_from_csv(self, file_path: str) -> Project:
         try:
-            import csv
-            import os
-            from domain.entities.project import Project
-            from domain.entities.alternative import Alternative
-            from domain.entities.criteria import Criteria, OptimizationType, ScaleType
+            
             
             # Extract directory and base name of the file
             dir_path = os.path.dirname(file_path)
@@ -706,26 +709,45 @@ class ProjectService:
             if os.path.exists(crit_path):
                 with open(crit_path, 'r', newline='', encoding='utf-8') as f:
                     reader = csv.reader(f)
-                    headers = next(reader)
+                    headers = next(reader)  # Read headers
+                    
+                    # Crear un mapeo de nombres de columna a índices
+                    col_map = {header: idx for idx, header in enumerate(headers)}
                     
                     for row in reader:
-                        if len(row) >= 4:
-                            opt_type = row[3] if len(row) > 3 else "maximize"
-                            scale_type = row[4] if len(row) > 4 else "quantitative"
+                        if len(row) >= 2:  # Al menos ID y Name
+                            # Usar el mapeo de columnas para obtener los valores correctos
+                            id_val = row[col_map.get('ID', 0)]
+                            name_val = row[col_map.get('Name', 1)]
+                            desc_val = row[col_map.get('Description', 2)] if 'Description' in col_map and len(row) > col_map['Description'] else ""
                             
+                            # Obtener optimization type
+                            opt_type_idx = col_map.get('Optimization Type', -1)
+                            opt_type = row[opt_type_idx] if opt_type_idx >= 0 and len(row) > opt_type_idx else "maximize"
+                            
+                            # Obtener scale type
+                            scale_type_idx = col_map.get('Scale Type', -1)
+                            scale_type = row[scale_type_idx] if scale_type_idx >= 0 and len(row) > scale_type_idx else "quantitative"
+                            
+                            # Obtener weight
+                            weight_idx = col_map.get('Weight', -1)
+                            weight = float(row[weight_idx]) if weight_idx >= 0 and len(row) > weight_idx else 1.0
+                            
+                            # Obtener unit
+                            unit_idx = col_map.get('Unit', -1)
+                            unit = row[unit_idx] if unit_idx >= 0 and len(row) > unit_idx else ""
+                            
+                            # Convertir a enums
                             if isinstance(opt_type, str):
                                 opt_type = OptimizationType(opt_type)
                                 
                             if isinstance(scale_type, str):
                                 scale_type = ScaleType(scale_type)
                             
-                            weight = float(row[5]) if len(row) > 5 else 1.0
-                            unit = row[6] if len(row) > 6 else ""
-                            
                             criteria = Criteria(
-                                id=row[0],
-                                name=row[1],
-                                description=row[2] if len(row) > 2 else "",
+                                id=id_val,
+                                name=name_val,
+                                description=desc_val,
                                 optimization_type=opt_type,
                                 scale_type=scale_type,
                                 weight=weight,
@@ -756,7 +778,7 @@ class ProjectService:
                                 for j in range(1, min(len(row), len(project.criteria) + 1)):
                                     try:
                                         value = float(row[j])
-                                        matrix.set_value(alt_idx, j - 1, value)
+                                        matrix.set_values(alt_idx, j - 1, value)
                                     except (ValueError, IndexError):
                                         
                                         pass

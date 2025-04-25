@@ -166,8 +166,8 @@ class Result:
                 Dict[str, Any]: Dictionary with comparative information
         """
         try:
-            idx_a = self._alternative_ids[id_a]
-            idx_b = self._alternative_ids[id_b]
+            idx_a = self._alternative_ids.index(id_a)
+            idx_b = self._alternative_ids.index(id_b)
         except ValueError as e:
             raise ValueError(f"ID of alternative not found: {e}")
         

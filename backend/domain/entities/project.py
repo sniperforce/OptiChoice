@@ -34,7 +34,7 @@ class Project:
     
     @property
     def name(self) -> str:
-        return self.name
+        return self._name
     
     @name.setter
     def name(self, value: str) -> None:
@@ -276,7 +276,7 @@ class Project:
             name=data['name'],
             description=data.get('description', ''),
             decision_maker=data.get('decision_maker', ''),
-            project_id=data['id'],
+            project_id=data.get('id'),
             metadata=data.get('metadata', {})
         )
 

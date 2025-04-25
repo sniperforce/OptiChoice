@@ -78,7 +78,11 @@ class DecisionMatrix:
         self._alternatives.append(alternative)
 
         # Prepare the new row for the matrix and add it
-        new_row = np.zeros(len(self._criteria) if values is None else np.array(values, dtype=float))
+        if values is None:
+            new_row = np.zeros(len(self._criteria))
+        else:
+            new_row = np.array(values, dtype=float)
+        
         self._values = np.vstack((self._values, new_row))
     
     def add_criteria(self, criteria: Criteria, values: Optional[List[float]] = None) -> None:
