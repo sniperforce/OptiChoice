@@ -236,7 +236,7 @@ class AHPMethod(MCDMMethodInterface):
         consistency_info = {}
 
         if comparison_matrix is None:
-            weights = np.ndarray([crit.weight for crit in criteria])
+            weights = np.array([crit.weight for crit in criteria])
 
             # Normalize weights
             sum_weights = np.sum(weights)
@@ -295,7 +295,7 @@ class AHPMethod(MCDMMethodInterface):
             comparison_matrices = []
 
             # Obtain the values from the decision matrix
-            values = np.zeros(n_alternatives, n_criteria)
+            values = np.zeros((n_alternatives, n_criteria))
             for i in range(n_alternatives):
                 for j in range(n_criteria):
                     values[i, j] = alternatives[i].get_metadata(f"criterion_{criteria[j].id}", 1.0)

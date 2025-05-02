@@ -141,7 +141,7 @@ class ELECTREMethod(MCDMMethodInterface):
             n_alternatives = len(alternatives)
             n_criteria = len(criteria)
 
-            if params.get('normalized_matrix', True):
+            if params.get('normalize_matrix', True):
                 values = normalize_matrix(
                     values=values,
                     criteria=criteria,

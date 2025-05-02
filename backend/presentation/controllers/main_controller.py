@@ -290,7 +290,7 @@ class MainController:
         return {
             'name': matrix.name,
             'shape': matrix.shape,
-            'alternatives': [alt.name for alt in matrix.alternatives],
+            'alternatives': [alt.name for alt in matrix.alternative],
             'criteria': [crit.name for crit in matrix.criteria],
             'has_values': matrix.values.size > 0
         }
@@ -320,7 +320,7 @@ class MainController:
             'shape': matrix.shape,
             'alternatives': [
                 {'id': alt.id, 'name': alt.name}
-                for alt in matrix.alternatives
+                for alt in matrix.alternative
             ],
             'criteria': [
                 {

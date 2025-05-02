@@ -399,7 +399,7 @@ class DecisionService:
             crit_idx, _ = project.decision_matrix.get_criteria_by_id(criteria_id)
             
             # Set value
-            project.decision_matrix.set_value(alt_idx, crit_idx, value)
+            project.decision_matrix.set_values(alt_idx, crit_idx, value)
             
         except ValueError as e:
             raise ServiceError(

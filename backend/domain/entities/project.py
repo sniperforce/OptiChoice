@@ -32,6 +32,11 @@ class Project:
     def id(self) -> str:
         return self._id
     
+    @id.setter
+    def id(self, value: str) -> None:
+        self._id = value
+        self._updated_at = datetime.now()
+    
     @property
     def name(self) -> str:
         return self._name

@@ -4,6 +4,8 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QTabWidget, QAction,
                              QHBoxLayout, QLabel, QMessageBox)
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QIcon, QFont
+from controllers.project_controller import ProjectController
+from PyQt5.QtWidgets import QFileDialog, QInputDialog
 
 class MCDMApplication(QMainWindow):
     """Main window for the MCDM (Multi-Criteria Decision Making) application"""
@@ -251,8 +253,9 @@ class MCDMApplication(QMainWindow):
     def init_tabs(self):
         from views.tabs.problem_tab import ProblemTab
 
+        self.project_controller = ProjectController()
         # Problem Definition tab
-        self.problem_tab = ProblemTab()
+        self.problem_tab = ProblemTab(self.project_controller)
         self.tab_widget.addTab(self.problem_tab, "Problem Definition")
         
         # Decision Matrix tab
@@ -278,16 +281,49 @@ class MCDMApplication(QMainWindow):
     # File menu actions
     def new_project(self):
         self.statusBar.showMessage("Creating new project...")
-        # TODO: Implement new project functionality
+        
+        # Clear the current project
+        self.project_controller.current_project_id = None
+        
+        # Reset the problem tab
+        self.problem_tab.name_edit.clear()
+        self.problem_tab.description_edit.clear()
+        self.problem_tab.decision_maker_edit.clear()
+        self.problem_tab.alt_table.setRowCount(0)
+        self.problem_tab.crit_table.setRowCount(0)
+        
+        self.statusBar.showMessage("New project created")
         
     def open_project(self):
         self.statusBar.showMessage("Opening project...")
-        # TODO: Implement open project functionality
+        
+        # Show file dialog to select project file
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Open Project", "", "All Files (*)")
+        
+        if file_path:
+            # Extract project_id from file (this will depend on your implementation)
+            # For now, assuming a simple implementation
+            import os
+            project_id = os.path.basename(file_path).split('.')[0]
+            
+            # Load the project
+            project = self.project_controller.load_project(project_id)
+            
+            if project:
+                # Refresh the problem tab with the loaded project
+                self.problem_tab.load_project_data()
+                self.statusBar.showMessage(f"Project '{project.get('name', '')}' loaded successfully")
+            else:
+                QMessageBox.critical(self, "Error", "Failed to load project")
+                self.statusBar.showMessage("Failed to load project")
+
         
     def save_project(self):
         self.statusBar.showMessage("Saving project...")
-        # TODO: Implement save project functionality
-        
+        self.problem_tab.save_project_info()
+        self.statusBar.showMessage("Project saved successfully")
+            
     def save_project_as(self):
         self.statusBar.showMessage("Saving project as...")
         # TODO: Implement save as functionality

@@ -5,6 +5,12 @@ class ProjectController:
         self.api_client = ApiClient()
         self.current_project_id = None
     
+    @property
+    def current_project(self):
+        if self.current_project_id:
+            return self.api_client.get_project(self.current_project_id)
+        return None
+
     def create_project(self, name, description="", decision_maker=""):
         result = self.api_client.create_project(name, description, decision_maker)
         if result:

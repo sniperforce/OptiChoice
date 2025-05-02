@@ -1,3 +1,4 @@
+# frontend/views/dialogs/criteria_dialog.py
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, 
                            QLineEdit, QComboBox, QDoubleSpinBox, 
                            QPushButton, QDialogButtonBox, QLabel)
@@ -34,7 +35,7 @@ class CriteriaDialog(QDialog):
         self.opt_type_combo = QComboBox()
         self.opt_type_combo.addItems(["maximize", "minimize"])
         if self.criterion:
-            index = self.opt_type_combo.findText(self.criterion.get('ooptimization_type', 'maximize'))
+            index = self.opt_type_combo.findText(self.criterion.get('optimization_type', 'maximize'))
             if index >= 0:
                 self.opt_type_combo.setCurrentIndex(index)
         form_layout.addRow("Optimization Type:", self.opt_type_combo)
@@ -45,7 +46,7 @@ class CriteriaDialog(QDialog):
             index = self.scale_type_combo.findText(self.criterion.get('scale_type','quantitative'))
             if index >= 0:
                 self.scale_type_combo.setCurrentIndex(index)
-        form_layout.addRow("Scale_Type:", self.scale_type_combo)
+        form_layout.addRow("Scale Type:", self.scale_type_combo)
 
         self.weight_spin = QDoubleSpinBox()
         self.weight_spin.setRange(0.01, 10.0)
@@ -64,8 +65,8 @@ class CriteriaDialog(QDialog):
 
         # Buttons
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(self.accepted)
-        button_box.rejected.connect(self.rejected)
+        button_box.accepted.connect(self.accept)  
+        button_box.rejected.connect(self.reject) 
         layout.addWidget(button_box)
     
     def get_data(self):
@@ -77,4 +78,3 @@ class CriteriaDialog(QDialog):
             'weight': self.weight_spin.value(),
             'unit': self.unit_edit.text()
         }
-
