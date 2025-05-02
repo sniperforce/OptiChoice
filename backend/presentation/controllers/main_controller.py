@@ -39,6 +39,16 @@ class MainController:
         self._current_project = project
         return project
     
+    def save_project_without_validation(self):
+        """Save project directly to repository without validation"""
+        if self._current_project is None:
+            raise ValueError("There is no current project to save")
+        
+        # Save directly to repository, bypassing validation
+        saved_project = self._project_repository.save(self._current_project)
+        self._current_project = saved_project
+        return saved_project
+
     def save_project(self) -> Project:
         if self._current_project is None:
             raise ValueError("There is no current project to save")

@@ -49,8 +49,9 @@ def create_project():
             decision_maker=data.get('decision_maker', '')
         )
         print(f"Project created: {project.id}")
-        controller.save_project()
-        print("Project saved successfully")
+        
+        controller.save_project_without_validation()
+        
         return jsonify({'id': project.id, 'name': project.name}), 201
     except Exception as e:
         print(f"Error creating project: {str(e)}")
@@ -82,6 +83,9 @@ def update_project(project_id):
     try:
         project = controller.load_project(project_id)
         
+        if project is None:
+            return jsonify({'error': f"Project {project_id} not found"}), 404
+        
         data = request.json
         if 'name' in data:
             project.name = data['name']
@@ -94,7 +98,10 @@ def update_project(project_id):
         
         return jsonify({'id': project.id, 'name': project.name})
     except Exception as e:
-        return jsonify({'error': str(e)}), 404
+        print(f"Error updating project: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/projects/<project_id>', methods=['DELETE'])
 def delete_project(project_id):
@@ -120,10 +127,22 @@ def search_projects():
 def save_project_explicitly(project_id):
     """Explicitly save a project after all components have been added"""
     try:
-        controller.load_project(project_id)
+        print(f"Explicitly saving project {project_id}")
+        project = controller.load_project(project_id)
+        
+        if project is None:
+            print(f"Project {project_id} not found")
+            return jsonify({'error': f"Project {project_id} not found"}), 404
+            
+        print(f"Project loaded with {len(project.alternatives)} alternatives and {len(project.criteria)} criteria")
         controller.save_project()
+        print("Project saved successfully")
+        
         return jsonify({'success': True}), 200
     except Exception as e:
+        print(f"Error saving project: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/projects/import', methods=['POST'])
@@ -209,9 +228,15 @@ def get_alternatives(project_id):
 @app.route('/api/projects/<project_id>/alternatives', methods=['POST'])
 def add_alternative(project_id):
     try:
-        controller.load_project(project_id)
+        print(f"Loading project {project_id}")
+        project = controller.load_project(project_id)
+        
+        if project is None:
+            return jsonify({'error': f"Project {project_id} not found"}), 404
         
         data = request.json
+        print(f"Adding alternative: {data}")
+        
         alternative = controller.add_alternative(
             id=data.get('id'),
             name=data.get('name'),
@@ -219,7 +244,8 @@ def add_alternative(project_id):
             metadata=data.get('metadata')
         )
         
-        controller.save_project()
+        # Remove this call to save_project - we'll save after all alternatives and criteria are added
+        # controller.save_project()
         
         return jsonify({
             'id': alternative.id,
@@ -227,6 +253,9 @@ def add_alternative(project_id):
             'description': alternative.description
         }), 201
     except Exception as e:
+        print(f"Error adding alternative: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/projects/<project_id>/alternatives/<alternative_id>', methods=['GET'])
@@ -261,9 +290,15 @@ def get_criteria(project_id):
 @app.route('/api/projects/<project_id>/criteria', methods=['POST'])
 def add_criteria(project_id):
     try:
-        controller.load_project(project_id)
+        print(f"Loading project {project_id}")
+        project = controller.load_project(project_id)
         
+        if project is None:
+            return jsonify({'error': f"Project {project_id} not found"}), 404
+
         data = request.json
+        print(f"Adding criteria: {data}")
+
         criteria = controller.add_criteria(
             id=data.get('id'),
             name=data.get('name'),
@@ -275,7 +310,7 @@ def add_criteria(project_id):
             metadata=data.get('metadata')
         )
         
-        controller.save_project()
+        #controller.save_project()
         
         return jsonify({
             'id': criteria.id,
@@ -285,6 +320,9 @@ def add_criteria(project_id):
             'weight': criteria.weight
         }), 201
     except Exception as e:
+        print(f"Error adding criteria: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/projects/<project_id>/criteria/<criteria_id>', methods=['GET'])
