@@ -39,6 +39,14 @@ class ProjectController:
         
         return self.api_client.update_project(self.current_project_id, data)
     
+    def save_project(self):
+        """Explicitly save the current project"""
+        if not self.current_project_id:
+            return False
+        
+        response = self.api_client.save_project(self.current_project_id)
+        return response
+
     def get_all_projects(self):
         return self.api_client.get_projects()
     

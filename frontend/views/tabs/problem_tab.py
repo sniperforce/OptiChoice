@@ -131,36 +131,82 @@ class ProblemTab(QWidget):
             QMessageBox.warning(self, "Warning", "Project name cannot be empty")
             return
         
+        # Check if we have at least one alternative and one criterion
+        if self.alt_table.rowCount() == 0:
+            QMessageBox.warning(self, "Warning", "You must add at least one alternative")
+            return
+            
+        if self.crit_table.rowCount() == 0:
+            QMessageBox.warning(self, "Warning", "You must add at least one criterion")
+            return
+        
         description = self.description_edit.toPlainText()
         decision_maker = self.decision_maker_edit.text()
         
         # If we're creating a new project
         if not self.project_controller.current_project_id:
             success = self.project_controller.create_project(name, description, decision_maker)
-            if success:
-                QMessageBox.information(self, "Success", "Project created successfully")
-                # Now save alternatives and criteria
-                self._save_alternatives_and_criteria()
-            else:
+            if not success:
                 QMessageBox.critical(self, "Error", "Failed to create project")
+                return
         else:
             # Update existing project
             success = self.project_controller.update_project(name, description, decision_maker)
-            if success:
-                QMessageBox.information(self, "Success", "Project updated successfully")
-                # Now save alternatives and criteria
-                self._save_alternatives_and_criteria()
-            else:
+            if not success:
                 QMessageBox.critical(self, "Error", "Failed to update project")
+                return
+        
+        # Add alternatives and criteria
+        success = self._save_alternatives_and_criteria()
+        if not success:
+            QMessageBox.critical(self, "Error", "Failed to save alternatives and criteria")
+            return
+        
+        # Finally, save the complete project
+        success = self.project_controller.save_project()
+        if success:
+            QMessageBox.information(self, "Success", "Project saved successfully")
+        else:
+            QMessageBox.critical(self, "Error", "Failed to save project")
     
     def _save_alternatives_and_criteria(self):
-        """Save all alternatives and criteria"""
-        # First, delete all existing alternatives and criteria
-        # Then add the new ones from the tables
-        
-        # This would be a more complex implementation depending on your API
-        # For now, we'll just show a placeholder implementation
-        QMessageBox.information(self, "Info", "Alternatives and criteria saved")
+        """Save all alternatives and criteria to the backend"""
+        try:
+            # First, save all alternatives from the table
+            for row in range(self.alt_table.rowCount()):
+                alt_id = self.alt_table.item(row, 0).text()
+                alt_name = self.alt_table.item(row, 1).text()
+                alt_description = self.alt_table.item(row, 2).text() if self.alt_table.item(row, 2) else ""
+                
+                # Add the alternative to the backend
+                result = self.project_controller.add_alternative(alt_id, alt_name, alt_description)
+                if not result:
+                    return False
+            
+            # Then, save all criteria from the table
+            for row in range(self.crit_table.rowCount()):
+                crit_id = self.crit_table.item(row, 0).text()
+                crit_name = self.crit_table.item(row, 1).text()
+                crit_type = self.crit_table.item(row, 2).text()
+                crit_weight = float(self.crit_table.item(row, 3).text())
+                crit_unit = self.crit_table.item(row, 4).text() if self.crit_table.item(row, 4) else ""
+                
+                # Add the criterion to the backend
+                result = self.project_controller.add_criterion(
+                    crit_id, 
+                    crit_name, 
+                    crit_type,  # optimization_type
+                    "quantitative",  # scale_type (default)
+                    crit_weight,
+                    crit_unit
+                )
+                if not result:
+                    return False
+                    
+            return True
+        except Exception as e:
+            print(f"Error saving alternatives and criteria: {str(e)}")
+            return False
     
     def add_alternative(self):
         """Open dialog to add a new alternative"""

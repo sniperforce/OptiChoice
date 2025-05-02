@@ -42,14 +42,20 @@ def get_projects():
 def create_project():
     try:
         data = request.json
+        print(f"Received data: {data}")
         project = controller.new_project(
             name=data.get('name', 'New Project'),
             description=data.get('description', ''),
             decision_maker=data.get('decision_maker', '')
         )
+        print(f"Project created: {project.id}")
         controller.save_project()
+        print("Project saved successfully")
         return jsonify({'id': project.id, 'name': project.name}), 201
     except Exception as e:
+        print(f"Error creating project: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/projects/<project_id>', methods=['GET'])
@@ -107,6 +113,16 @@ def search_projects():
         query = request.args.get('q', '')
         projects = controller.search_projects(query)
         return jsonify(projects)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/projects/<project_id>/save', methods=['POST'])
+def save_project_explicitly(project_id):
+    """Explicitly save a project after all components have been added"""
+    try:
+        controller.load_project(project_id)
+        controller.save_project()
+        return jsonify({'success': True}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

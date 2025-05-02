@@ -80,7 +80,10 @@ class ApiClient:
         response = self.session.delete(f"{self.base_url}/projects/{project_id}/criteria/{crit_id}")
         return response.status_code == 204
 
-
+    def save_project(self, project_id):
+        """Explicitly save a project after alternatives and criteria have been added"""
+        response = self.session.post(f"{self.base_url}/projects/{project_id}/save")
+        return response.status_code == 200
 
     
         
