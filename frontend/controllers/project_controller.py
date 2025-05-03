@@ -29,7 +29,7 @@ class ProjectController:
         if not self.current_project_id:
             return False
         
-        data={}
+        data = {}
         if name is not None:
             data['name'] = name
         if description is not None:

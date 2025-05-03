@@ -33,16 +33,9 @@ class FileProjectRepository(ProjectRepository):
             project_dict = project.to_dict()
             
             file_path = os.path.join(self._base_dir, f"project_{project.id}.json")
-            print(f"Saving project to {file_path}")
             
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(project_dict, f, indent=2, ensure_ascii=False)
-            
-            # Verify the file was created
-            if os.path.exists(file_path):
-                print(f"File successfully created at {file_path}")
-            else:
-                print(f"ERROR: File not created at {file_path}")
             
             return project
             
@@ -74,7 +67,7 @@ class FileProjectRepository(ProjectRepository):
                 message=f"Error retrieving project {project_id}: {str(e)}",
                 cause=e
             )
-    
+        
     def get_all(self) -> List[Project]:
         try:
             projects = []

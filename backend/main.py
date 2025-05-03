@@ -1,8 +1,8 @@
 """
-    Main entry point for the MCDM systme.
+Main entry point for the MCDM system.
 
-    This module initialize all system components and provides
-    a REST API for the frontend to interact with the backend
+This module initializes all system components and provides
+a REST API for the frontend to interact with the backend
 """
 
 import os
@@ -42,21 +42,16 @@ def get_projects():
 def create_project():
     try:
         data = request.json
-        print(f"Received data: {data}")
         project = controller.new_project(
             name=data.get('name', 'New Project'),
             description=data.get('description', ''),
             decision_maker=data.get('decision_maker', '')
         )
-        print(f"Project created: {project.id}")
         
-        controller.save_project_without_validation()
+        controller.save_project()
         
         return jsonify({'id': project.id, 'name': project.name}), 201
     except Exception as e:
-        print(f"Error creating project: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/projects/<project_id>', methods=['GET'])
@@ -78,164 +73,30 @@ def get_project(project_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 404
 
-@app.route('/api/projects/<project_id>', methods=['PUT'])
-def update_project(project_id):
-    try:
-        project = controller.load_project(project_id)
-        
-        if project is None:
-            return jsonify({'error': f"Project {project_id} not found"}), 404
-        
-        data = request.json
-        if 'name' in data:
-            project.name = data['name']
-        if 'description' in data:
-            project.description = data['description']
-        if 'decision_maker' in data:
-            project.decision_maker = data['decision_maker']
-        
-        controller.save_project()
-        
-        return jsonify({'id': project.id, 'name': project.name})
-    except Exception as e:
-        print(f"Error updating project: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/projects/<project_id>', methods=['DELETE'])
-def delete_project(project_id):
-    try:
-        result = controller.delete_project(project_id)
-        if result:
-            return '', 204
-        else:
-            return jsonify({'error': 'Project not found'}), 404
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/projects/search', methods=['GET'])
-def search_projects():
-    try:
-        query = request.args.get('q', '')
-        projects = controller.search_projects(query)
-        return jsonify(projects)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/api/projects/<project_id>/save', methods=['POST'])
 def save_project_explicitly(project_id):
     """Explicitly save a project after all components have been added"""
     try:
-        print(f"Explicitly saving project {project_id}")
         project = controller.load_project(project_id)
         
         if project is None:
-            print(f"Project {project_id} not found")
             return jsonify({'error': f"Project {project_id} not found"}), 404
             
-        print(f"Project loaded with {len(project.alternatives)} alternatives and {len(project.criteria)} criteria")
         controller.save_project()
-        print("Project saved successfully")
         
         return jsonify({'success': True}), 200
     except Exception as e:
-        print(f"Error saving project: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
-@app.route('/api/projects/import', methods=['POST'])
-def import_project():
-    try:
-        # Verify that there is a file in the request
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file was provided'}), 400
-            
-        file = request.files['file']
-        
-        # Verify that the file has a name
-        if file.filename == '':
-            return jsonify({'error': 'Empty filename'}), 400
-            
-        # Verify that the file has an allowed extension
-        if not allowed_file(file.filename):
-            return jsonify({'error': 'Unsupported file format'}), 400
-            
-        # Save file temporarily
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
-        # Infer file format
-        format_type = None
-        if filename.endswith('.json'):
-            format_type = 'json'
-        elif filename.endswith('.xlsx') or filename.endswith('.xls'):
-            format_type = 'excel'
-        elif filename.endswith('.csv'):
-            format_type = 'csv'
-        
-        # Import project
-        project = controller.import_project(filepath, format_type)
-        controller.save_project()
-        
-        # Clean up temporary file
-        os.remove(filepath)
-        
-        return jsonify({'id': project.id, 'name': project.name}), 201
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/projects/<project_id>/export', methods=['GET'])
-def export_project(project_id):
-    try:
-        # Get format
-        format_type = request.args.get('format', 'json').lower()
-        
-        # Verify supported format
-        if format_type not in ['json', 'excel', 'csv', 'pdf']:
-            return jsonify({'error': 'Unsupported format'}), 400
-            
-        # Load project
-        project = controller.load_project(project_id)
-        
-        # Create filename
-        filename = f"project_{project.id}.{format_type}"
-        if format_type == 'excel':
-            filename = f"project_{project.id}.xlsx"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
-        # Export project
-        controller.export_project(filepath, format_type)
-        
-        # Send file
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-# Routes for alternatives
-@app.route('/api/projects/<project_id>/alternatives', methods=['GET'])
-def get_alternatives(project_id):
-    """Gets all alternatives of a project."""
-    try:
-        controller.load_project(project_id)
-        alternatives = controller.get_all_alternatives()
-        return jsonify(alternatives)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 404
 
 @app.route('/api/projects/<project_id>/alternatives', methods=['POST'])
 def add_alternative(project_id):
     try:
-        print(f"Loading project {project_id}")
         project = controller.load_project(project_id)
         
         if project is None:
             return jsonify({'error': f"Project {project_id} not found"}), 404
         
         data = request.json
-        print(f"Adding alternative: {data}")
         
         alternative = controller.add_alternative(
             id=data.get('id'),
@@ -244,18 +105,12 @@ def add_alternative(project_id):
             metadata=data.get('metadata')
         )
         
-        # Remove this call to save_project - we'll save after all alternatives and criteria are added
-        # controller.save_project()
-        
         return jsonify({
             'id': alternative.id,
             'name': alternative.name,
             'description': alternative.description
         }), 201
     except Exception as e:
-        print(f"Error adding alternative: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/projects/<project_id>/alternatives/<alternative_id>', methods=['GET'])

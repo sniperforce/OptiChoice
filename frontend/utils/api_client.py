@@ -8,10 +8,10 @@ class ApiClient:
     
     def get_projects(self):
         response = self.session.get(f"{self.base_url}/projects")
-        return response.json if response.status_code == 200 else []
+        return response.json() if response.status_code == 200 else []
     
     def create_project(self, name, description="", decision_maker=""):
-        data={
+        data = {
             "name": name,
             "description": description,
             "decision_maker": decision_maker
@@ -31,6 +31,11 @@ class ApiClient:
         response = self.session.delete(f"{self.base_url}/projects/{project_id}")
         return response.status_code == 204
 
+    def save_project(self, project_id):
+        """Explicitly save a project after alternatives and criteria have been added"""
+        response = self.session.post(f"{self.base_url}/projects/{project_id}/save")
+        return response.status_code == 200
+    
     # Alternatives endpoints
     def get_alternatives(self, project_id):
         response = self.session.get(f"{self.base_url}/projects/{project_id}/alternatives")
@@ -80,10 +85,6 @@ class ApiClient:
         response = self.session.delete(f"{self.base_url}/projects/{project_id}/criteria/{crit_id}")
         return response.status_code == 204
 
-    def save_project(self, project_id):
-        """Explicitly save a project after alternatives and criteria have been added"""
-        response = self.session.post(f"{self.base_url}/projects/{project_id}/save")
-        return response.status_code == 200
 
     
         

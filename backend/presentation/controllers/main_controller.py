@@ -18,10 +18,9 @@ from application.services.decision_service import DecisionService
 from utils.exceptions import ServiceError
 
 class MainController:
-    def __init__(self, project_respository: ProjectRepository):
-        self._project_service = ProjectService(project_respository)
+    def __init__(self, project_repository: ProjectRepository):
+        self._project_service = ProjectService(project_repository)
         self._decision_service = DecisionService()
-
         self._current_project = None
     
     @property
@@ -35,40 +34,24 @@ class MainController:
             description=description, 
             decision_maker=decision_maker
         )
-
         self._current_project = project
         return project
     
-    def save_project_without_validation(self):
-        """Save project directly to repository without validation"""
-        if self._current_project is None:
-            raise ValueError("There is no current project to save")
-        
-        # Save directly to repository, bypassing validation
-        saved_project = self._project_repository.save(self._current_project)
-        self._current_project = saved_project
-        return saved_project
-
     def save_project(self) -> Project:
         if self._current_project is None:
             raise ValueError("There is no current project to save")
         
         saved_project = self._project_service.save_project(self._current_project)
-
         self._current_project = saved_project
-
         return saved_project
     
     def load_project(self, project_id: str) -> Project:
         project = self._project_service.get_project(project_id)
-
         self._current_project = project
-
         return project
     
     def get_all_projects(self) -> List[Dict[str, Any]]:
         projects = self._project_service.get_all_projects()
-
         return [
             {
                 'id': project.id,
@@ -92,7 +75,6 @@ class MainController:
     
     def search_projects(self, query: str) -> List[Dict[str, Any]]:
         projects = self._project_service.search_projects(query)
-
         return [
             {
                 'id': project.id,
@@ -113,7 +95,6 @@ class MainController:
             raise ValueError("There is no current project to export")
         
         format_type = format_type.lower()
-
         if format_type == 'json':
             self._project_service.export_to_json(self._current_project, file_path)
         elif format_type == 'excel':
@@ -149,14 +130,11 @@ class MainController:
             raise ValueError(f"Importation format not supported: {format_type}")
         
         self._current_project = project
-
         return project
     
     def duplicate_project(self, project_id: str, new_name: Optional[str] = None) -> Project:
         project = self._project_service.duplicate_project(project_id, new_name)
-
         self._current_project = project
-
         return project
     
     def add_alternative(self, id: str, name: str, description: str= "",
