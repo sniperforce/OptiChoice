@@ -100,15 +100,21 @@ class Project:
         return self._metadata.get(key, default)
 
     def add_alternative(self, alternative: Alternative) -> None:
-        # Verify if already exist an alternative with the same ID
+        # Verifica si ya existe una alternativa con el mismo ID
         if any(alt.id == alternative.id for alt in self._alternatives):
-            raise ValueError(f"Already exist an alternative with ID: {alternative.id}")
+            raise ValueError(f"Already exists an alternative with ID: {alternative.id}")
         
         self._alternatives.append(alternative)
         self._updated_at = datetime.now()
 
+        # Actualización segura de la matriz de decisión
         if self._decision_matrix is not None:
-            self._decision_matrix.add_alternative(alternative)
+            try:
+                self._decision_matrix.add_alternative(alternative)
+            except Exception as e:
+                # Si falla la actualización de la matriz, revertimos la operación
+                self._alternatives.pop()
+                raise ValueError(f"Error updating decision matrix: {str(e)}")
         
     def add_criteria(self, criteria: Criteria) -> None:
         # Verify if already existe a criteria with the same ID

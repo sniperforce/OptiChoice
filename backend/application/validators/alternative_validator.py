@@ -4,10 +4,14 @@ class AlternativeValidator:
     @staticmethod
     def validate_id(id:str) -> Tuple[bool, Optional[str]]:
         if not id:
-            return False, "El identificador de la alternativa no puede estar vacío"
+            return False, "Alternative ID cannot be empty"
         
         if not isinstance(id, str):
-            return False, "El identificador debe ser una cadena de texto"
+            return False, "ID must be a string"
+        
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+$', id):
+            return False, "ID must contain only letters, numbers, underscores, and hyphens"
         
         return True, None
     

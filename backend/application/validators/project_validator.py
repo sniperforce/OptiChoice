@@ -317,7 +317,7 @@ class ProjectValidator:
                 project.decision_matrix, project.alternatives, project.criteria)
             if not matrix_valid:
                 errors.extend(matrix_errors)
-       
+    
         results_valid, results_errors = ProjectValidator.validate_results(
             project.results, project.alternatives)
         if not results_valid:

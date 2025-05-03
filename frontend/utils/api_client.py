@@ -33,8 +33,19 @@ class ApiClient:
 
     def save_project(self, project_id):
         """Explicitly save a project after alternatives and criteria have been added"""
-        response = self.session.post(f"{self.base_url}/projects/{project_id}/save")
-        return response.status_code == 200
+        try:
+            response = self.session.post(f"{self.base_url}/projects/{project_id}/save")
+            
+            if response.status_code == 400:
+                # Error de validación - podríamos registrar esto o mostrar más información
+                error_data = response.json()
+                error_details = error_data.get('details', [])
+                print(f"Validation errors: {error_details}")
+                
+            return response.status_code == 200
+        except Exception as e:
+            print(f"Error saving project: {str(e)}")
+            return False
     
     # Alternatives endpoints
     def get_alternatives(self, project_id):
@@ -42,13 +53,28 @@ class ApiClient:
         return response.json() if response.status_code == 200 else []
 
     def add_alternative(self, project_id, alt_id, name, description=""):
-        data={
+        if not alt_id or not name:
+            print("Error: Alternative ID and name are required")
+            return None
+            
+        data = {
             'id': alt_id,
-            'name':name,
+            'name': name,
             'description': description
         }
-        response = self.session.post(f"{self.base_url}/projects/{project_id}/alternatives", json=data)
-        return response.json() if response.status_code == 201 else None
+        
+        try:
+            response = self.session.post(f"{self.base_url}/projects/{project_id}/alternatives", json=data)
+            
+            if response.status_code == 201:
+                return response.json()
+            else:
+                error_data = response.json() if response.text else {"error": "Unknown error"}
+                print(f"Error adding alternative: {error_data.get('error', 'Unknown error')}")
+                return None
+        except Exception as e:
+            print(f"Exception when adding alternative: {str(e)}")
+            return None
     
     def update_alternative(self, project_id, alt_id, data):
         response = self.session.put(f"{self.base_url}/projects/{project_id}/alternatives/{alt_id}", json=data)

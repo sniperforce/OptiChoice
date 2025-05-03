@@ -48,8 +48,6 @@ def create_project():
             decision_maker=data.get('decision_maker', '')
         )
         
-        controller.save_project()
-        
         return jsonify({'id': project.id, 'name': project.name}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -76,17 +74,82 @@ def get_project(project_id):
 @app.route('/api/projects/<project_id>/save', methods=['POST'])
 def save_project_explicitly(project_id):
     """Explicitly save a project after all components have been added"""
+    from utils.exceptions import ValidationError
     try:
         project = controller.load_project(project_id)
         
         if project is None:
             return jsonify({'error': f"Project {project_id} not found"}), 404
             
-        controller.save_project()
-        
-        return jsonify({'success': True}), 200
+        try:
+            controller.save_project()
+            return jsonify({'success': True, 'message': 'Project saved successfully'}), 200
+        except ValidationError as ve:
+            return jsonify({
+                'error': 'Validation error',
+                'details': ve.errors if hasattr(ve, 'errors') else [str(ve)]
+            }), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/projects/<project_id>', methods=['PUT'])
+def update_project(project_id):
+    try:
+        project = controller.load_project(project_id)
+        
+        if project is None:
+            return jsonify({'error': f"Project {project_id} not found"}), 404
+        
+        data = request.json
+        
+        if 'name' in data:
+            project.name = data['name']
+        if 'description' in data:
+            project.description = data['description']
+        if 'decision_maker' in data:
+            project.decision_maker = data['decision_maker']
+
+        if 'alternatives' in data:
+
+            for alt in list(project.alternatives):
+                controller.remove_alternative(alt.id)
+
+            for alt_data in data['alternatives']:
+                controller.add_alternative(
+                    id=alt_data['id'],
+                    name=alt_data['name'],
+                    description=alt_data.get('description', ''),
+                    metadata=alt_data.get('metadata', {})
+                )
+
+        if 'criteria' in data:
+
+            for crit in list(project.criteria):
+                controller.remove_criteria(crit.id)
+
+            for crit_data in data['criteria']:
+                controller.add_criteria(
+                    id=crit_data['id'],
+                    name=crit_data['name'],
+                    description=crit_data.get('description', ''),
+                    optimization_type=crit_data.get('optimization_type', 'maximize'),
+                    scale_type=crit_data.get('scale_type', 'quantitative'),
+                    weight=float(crit_data.get('weight', 1.0)),
+                    unit=crit_data.get('unit', ''),
+                    metadata=crit_data.get('metadata', {})
+                )             
+        
+        return jsonify({
+            'id': project.id,
+            'name': project.name,
+            'description': project.description,
+            'decision_maker': project.decision_maker,
+            'n_alternatives': len(project.alternatives),
+            'n_criteria': len(project.criteria)
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/projects/<project_id>/alternatives', methods=['POST'])
 def add_alternative(project_id):
@@ -98,20 +161,44 @@ def add_alternative(project_id):
         
         data = request.json
         
-        alternative = controller.add_alternative(
-            id=data.get('id'),
-            name=data.get('name'),
-            description=data.get('description', ''),
-            metadata=data.get('metadata')
-        )
+        # Verificación básica de datos
+        if not data:
+            return jsonify({'error': "No data provided"}), 400
+            
+        if 'id' not in data or not data['id']:
+            return jsonify({'error': "Alternative ID is required"}), 400
+            
+        if 'name' not in data or not data['name']:
+            return jsonify({'error': "Alternative name is required"}), 400
         
-        return jsonify({
-            'id': alternative.id,
-            'name': alternative.name,
-            'description': alternative.description
-        }), 201
+        try:
+            alternative = controller.add_alternative(
+                id=data['id'],
+                name=data['name'],
+                description=data.get('description', ''),
+                metadata=data.get('metadata')
+            )
+            
+            return jsonify({
+                'id': alternative.id,
+                'name': alternative.name,
+                'description': alternative.description
+            }), 201
+        except ValueError as e:
+            # Error específico de validación
+            return jsonify({'error': str(e)}), 400
+        except Exception as e:
+            # Registrar el error detallado para depuración
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error adding alternative: {error_trace}")
+            return jsonify({'error': f"Server error: {str(e)}"}), 500
+            
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error in add_alternative endpoint: {error_trace}")
+        return jsonify({'error': f"Server error: {str(e)}"}), 500
 
 @app.route('/api/projects/<project_id>/alternatives/<alternative_id>', methods=['GET'])
 def get_alternative(project_id, alternative_id):
@@ -145,40 +232,63 @@ def get_criteria(project_id):
 @app.route('/api/projects/<project_id>/criteria', methods=['POST'])
 def add_criteria(project_id):
     try:
-        print(f"Loading project {project_id}")
         project = controller.load_project(project_id)
         
         if project is None:
             return jsonify({'error': f"Project {project_id} not found"}), 404
 
         data = request.json
-        print(f"Adding criteria: {data}")
+        
+        # Verificación básica de datos
+        if not data:
+            return jsonify({'error': "No data provided"}), 400
+            
+        if 'id' not in data or not data['id']:
+            return jsonify({'error': "Criterion ID is required"}), 400
+            
+        if 'name' not in data or not data['name']:
+            return jsonify({'error': "Criterion name is required"}), 400
 
-        criteria = controller.add_criteria(
-            id=data.get('id'),
-            name=data.get('name'),
-            description=data.get('description', ''),
-            optimization_type=data.get('optimization_type', 'maximize'),
-            scale_type=data.get('scale_type', 'quantitative'),
-            weight=float(data.get('weight', 1.0)),
-            unit=data.get('unit', ''),
-            metadata=data.get('metadata')
-        )
-        
-        #controller.save_project()
-        
-        return jsonify({
-            'id': criteria.id,
-            'name': criteria.name,
-            'description': criteria.description,
-            'optimization_type': criteria.optimization_type.value,
-            'weight': criteria.weight
-        }), 201
+        try:
+            # Convertir weight a float con manejo de errores
+            weight = 1.0
+            if 'weight' in data:
+                try:
+                    weight = float(data['weight'])
+                except (ValueError, TypeError):
+                    return jsonify({'error': "Weight must be a number"}), 400
+            
+            criteria = controller.add_criteria(
+                id=data['id'],
+                name=data['name'],
+                description=data.get('description', ''),
+                optimization_type=data.get('optimization_type', 'maximize'),
+                scale_type=data.get('scale_type', 'quantitative'),
+                weight=weight,
+                unit=data.get('unit', ''),
+                metadata=data.get('metadata')
+            )
+            
+            return jsonify({
+                'id': criteria.id,
+                'name': criteria.name,
+                'description': criteria.description,
+                'optimization_type': criteria.optimization_type.value,
+                'weight': criteria.weight
+            }), 201
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error adding criterion: {error_trace}")
+            return jsonify({'error': f"Server error: {str(e)}"}), 500
+            
     except Exception as e:
-        print(f"Error adding criteria: {str(e)}")
         import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        error_trace = traceback.format_exc()
+        print(f"Error in add_criteria endpoint: {error_trace}")
+        return jsonify({'error': f"Server error: {str(e)}"}), 500
 
 @app.route('/api/projects/<project_id>/criteria/<criteria_id>', methods=['GET'])
 def get_criteria_by_id(project_id, criteria_id):

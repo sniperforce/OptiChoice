@@ -131,11 +131,11 @@ class ProblemTab(QWidget):
             QMessageBox.warning(self, "Warning", "Project name cannot be empty")
             return
         
-        # Check if we have at least one alternative and one criterion
+        # Comprobar si tenemos al menos una alternativa y un criterio
         if self.alt_table.rowCount() == 0:
             QMessageBox.warning(self, "Warning", "You must add at least one alternative")
             return
-            
+                
         if self.crit_table.rowCount() == 0:
             QMessageBox.warning(self, "Warning", "You must add at least one criterion")
             return
@@ -143,31 +143,31 @@ class ProblemTab(QWidget):
         description = self.description_edit.toPlainText()
         decision_maker = self.decision_maker_edit.text()
         
-        # If we're creating a new project
+        # Si estamos creando un nuevo proyecto
         if not self.project_controller.current_project_id:
             success = self.project_controller.create_project(name, description, decision_maker)
             if not success:
                 QMessageBox.critical(self, "Error", "Failed to create project")
                 return
         else:
-            # Update existing project
+            # Actualizar proyecto existente
             success = self.project_controller.update_project(name, description, decision_maker)
             if not success:
                 QMessageBox.critical(self, "Error", "Failed to update project")
                 return
         
-        # Add alternatives and criteria
+        # Guardar alternativas y criterios
         success = self._save_alternatives_and_criteria()
         if not success:
             QMessageBox.critical(self, "Error", "Failed to save alternatives and criteria")
             return
         
-        # Finally, save the complete project
+        # Finalmente, guardar el proyecto completo explícitamente
         success = self.project_controller.save_project()
         if success:
             QMessageBox.information(self, "Success", "Project saved successfully")
         else:
-            QMessageBox.critical(self, "Error", "Failed to save project")
+            QMessageBox.critical(self, "Error", "Failed to save project. Make sure all required fields are filled correctly.")
     
     def _save_alternatives_and_criteria(self):
         """Save all alternatives and criteria to the backend"""

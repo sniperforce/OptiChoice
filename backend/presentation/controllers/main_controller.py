@@ -41,9 +41,15 @@ class MainController:
         if self._current_project is None:
             raise ValueError("There is no current project to save")
         
-        saved_project = self._project_service.save_project(self._current_project)
-        self._current_project = saved_project
-        return saved_project
+        try:
+            saved_project = self._project_service.save_project(self._current_project)
+            self._current_project = saved_project
+            return saved_project
+        except Exception as e:
+            # Registrar el error para depuración
+            import traceback
+            traceback.print_exc()
+            raise ValueError(f"Error saving project: {str(e)}")
     
     def load_project(self, project_id: str) -> Project:
         project = self._project_service.get_project(project_id)
