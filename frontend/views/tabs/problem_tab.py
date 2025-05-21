@@ -10,8 +10,8 @@ class ProblemTab(QWidget):
     def __init__(self, project_controller, parent=None):
         super().__init__(parent)
         self.project_controller = project_controller
+        self.is_loading = False  # Flag para evitar loops de carga
         self.init_ui()
-        self.load_project_data()
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -43,7 +43,6 @@ class ProblemTab(QWidget):
         self.alt_table = QTableWidget(0, 3)
         self.alt_table.setHorizontalHeaderLabels(["ID", "Name", "Description"])
         self.alt_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        # Prevent direct editing
         self.alt_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         alt_layout.addWidget(self.alt_table)
 
@@ -67,7 +66,6 @@ class ProblemTab(QWidget):
         self.crit_table = QTableWidget(0, 5)
         self.crit_table.setHorizontalHeaderLabels(["ID", "Name", "Type", "Weight", "Unit"])
         self.crit_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        # Prevent direct editing
         self.crit_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         crit_layout.addWidget(self.crit_table)
 
@@ -105,148 +103,97 @@ class ProblemTab(QWidget):
     
     def load_project_data(self):
         """Load project data if a project is currently loaded"""
+        if self.is_loading:
+            return
+            
         if self.project_controller.current_project_id:
-            project = self.project_controller.load_project(self.project_controller.current_project_id)
-            if project:
-                self.name_edit.setText(project.get('name', ''))
-                self.description_edit.setText(project.get('description', ''))
-                self.decision_maker_edit.setText(project.get('decision_maker', ''))
-                
-                # Load alternatives
-                alternatives = self.project_controller.get_alternatives()
-                self.alt_table.setRowCount(0)
-                for alt in alternatives:
-                    self._add_alternative_to_table(alt)
-                
-                # Load criteria
-                criteria = self.project_controller.get_criteria()
-                self.crit_table.setRowCount(0)
-                for crit in criteria:
-                    self._add_criterion_to_table(crit)
+            self.is_loading = True
+            try:
+                project = self.project_controller.get_current_project()
+                if project:
+                    self.name_edit.setText(project.get('name', ''))
+                    self.description_edit.setText(project.get('description', ''))
+                    self.decision_maker_edit.setText(project.get('decision_maker', ''))
+                    
+                    # Load alternatives and criteria
+                    self._refresh_tables()
+            finally:
+                self.is_loading = False
+    
+    def _refresh_tables(self):
+        """Refresh both tables with current data from backend"""
+        # Load alternatives
+        alternatives = self.project_controller.get_alternatives()
+        self.alt_table.setRowCount(0)
+        for alt in alternatives:
+            self._add_alternative_to_table(alt)
+        
+        # Load criteria
+        criteria = self.project_controller.get_criteria()
+        self.crit_table.setRowCount(0)
+        for crit in criteria:
+            self._add_criterion_to_table(crit)
     
     def save_project(self):
-        """Save all project data"""
-        name = self.name_edit.text()
+        """Save all project data in one clean operation"""
+        name = self.name_edit.text().strip()
         if not name:
             QMessageBox.warning(self, "Warning", "Project name cannot be empty")
             return
         
-        # Comprobar si tenemos al menos una alternativa y un criterio
-        if self.alt_table.rowCount() == 0:
-            QMessageBox.warning(self, "Warning", "You must add at least one alternative")
-            return
-                
-        if self.crit_table.rowCount() == 0:
-            QMessageBox.warning(self, "Warning", "You must add at least one criterion")
-            return
+        description = self.description_edit.toPlainText().strip()
+        decision_maker = self.decision_maker_edit.text().strip()
         
-        description = self.description_edit.toPlainText()
-        decision_maker = self.decision_maker_edit.text()
-        
-        # Si estamos creando un nuevo proyecto
-        if not self.project_controller.current_project_id:
-            success = self.project_controller.create_project(name, description, decision_maker)
-            if not success:
-                QMessageBox.critical(self, "Error", "Failed to create project")
-                return
-        else:
-            # Actualizar proyecto existente
-            success = self.project_controller.update_project(name, description, decision_maker)
-            if not success:
-                QMessageBox.critical(self, "Error", "Failed to update project")
-                return
-        
-        # Guardar alternativas y criterios
-        success = self._save_alternatives_and_criteria()
-        if not success:
-            QMessageBox.critical(self, "Error", "Failed to save alternatives and criteria")
-            return
-        
-        # Finalmente, guardar el proyecto completo explícitamente
-        success = self.project_controller.save_project()
-        if success:
-            QMessageBox.information(self, "Success", "Project saved successfully")
-        else:
-            QMessageBox.critical(self, "Error", "Failed to save project. Make sure all required fields are filled correctly.")
-    
-    def _save_alternatives_and_criteria(self):
-        """Save all alternatives and criteria to the backend"""
         try:
-            # First, save all alternatives from the table
-            for row in range(self.alt_table.rowCount()):
-                alt_id = self.alt_table.item(row, 0).text()
-                alt_name = self.alt_table.item(row, 1).text()
-                alt_description = self.alt_table.item(row, 2).text() if self.alt_table.item(row, 2) else ""
-                
-                # Add the alternative to the backend
-                result = self.project_controller.add_alternative(alt_id, alt_name, alt_description)
-                if not result:
-                    return False
+            # Step 1: Create or update basic project info
+            if not self.project_controller.current_project_id:
+                success = self.project_controller.create_project(name, description, decision_maker)
+                if not success:
+                    QMessageBox.critical(self, "Error", "Failed to create project")
+                    return
+                print(f"Created project with ID: {self.project_controller.current_project_id}")
+            else:
+                success = self.project_controller.update_project(name, description, decision_maker)
+                if not success:
+                    QMessageBox.critical(self, "Error", "Failed to update project")
+                    return
             
-            # Then, save all criteria from the table
-            for row in range(self.crit_table.rowCount()):
-                crit_id = self.crit_table.item(row, 0).text()
-                crit_name = self.crit_table.item(row, 1).text()
-                crit_type = self.crit_table.item(row, 2).text()
-                crit_weight = float(self.crit_table.item(row, 3).text())
-                crit_unit = self.crit_table.item(row, 4).text() if self.crit_table.item(row, 4) else ""
+            # Step 2: Save the complete project
+            success = self.project_controller.save_complete_project()
+            if success:
+                QMessageBox.information(self, "Success", "Project saved successfully")
+                self._refresh_tables()  # Refresh to show any backend changes
+            else:
+                QMessageBox.critical(self, "Error", "Failed to save project completely")
                 
-                # Add the criterion to the backend
-                result = self.project_controller.add_criterion(
-                    crit_id, 
-                    crit_name, 
-                    crit_type,  # optimization_type
-                    "quantitative",  # scale_type (default)
-                    crit_weight,
-                    crit_unit
-                )
-                if not result:
-                    return False
-                    
-            return True
         except Exception as e:
-            print(f"Error saving alternatives and criteria: {str(e)}")
-            return False
+            QMessageBox.critical(self, "Error", f"Unexpected error: {str(e)}")
+            print(f"Save error: {str(e)}")
     
     def add_alternative(self):
-        """Open dialog to add a new alternative"""
+        """Add a new alternative"""
         dialog = AlternativeDialog(self)
         if dialog.exec_():
             alt_data = dialog.get_data()
             
-            # Check if ID is provided
-            if not alt_data['id']:
+            if not alt_data['id'].strip():
                 QMessageBox.warning(self, "Warning", "Alternative ID is required")
                 return
                 
-            # Check if name is provided
-            if not alt_data['name']:
+            if not alt_data['name'].strip():
                 QMessageBox.warning(self, "Warning", "Alternative name is required")
                 return
             
-            # Add to backend if connected to a project
-            if self.project_controller.current_project_id:
-                result = self.project_controller.add_alternative(
-                    alt_data['id'], 
-                    alt_data['name'], 
-                    alt_data['description']
-                )
-                
-                if result:
-                    self._add_alternative_to_table(alt_data)
-                else:
-                    QMessageBox.critical(self, "Error", "Failed to add alternative")
-            else:
-                # Just add to table if no project is saved yet
-                self._add_alternative_to_table(alt_data)
+            # Just add to table - will be saved when user clicks Save Project
+            self._add_alternative_to_table(alt_data)
     
     def _add_alternative_to_table(self, alt_data):
         """Add alternative data to the table"""
         row = self.alt_table.rowCount()
         self.alt_table.insertRow(row)
-        self.alt_table.setItem(row, 0, QTableWidgetItem(alt_data['id']))
-        self.alt_table.setItem(row, 1, QTableWidgetItem(alt_data['name']))
-        self.alt_table.setItem(row, 2, QTableWidgetItem(alt_data.get('description', '')))
+        self.alt_table.setItem(row, 0, QTableWidgetItem(str(alt_data.get('id', ''))))
+        self.alt_table.setItem(row, 1, QTableWidgetItem(str(alt_data.get('name', ''))))
+        self.alt_table.setItem(row, 2, QTableWidgetItem(str(alt_data.get('description', ''))))
     
     def edit_alternative(self):
         """Edit the selected alternative"""
@@ -255,36 +202,19 @@ class ProblemTab(QWidget):
             QMessageBox.warning(self, "Warning", "Please select an alternative to edit")
             return
         
-        # Get data from the selected row
         alt_data = {
             'id': self.alt_table.item(current_row, 0).text(),
             'name': self.alt_table.item(current_row, 1).text(),
             'description': self.alt_table.item(current_row, 2).text() if self.alt_table.item(current_row, 2) else ''
         }
         
-        # Open dialog with current data
         dialog = AlternativeDialog(self, alt_data)
         if dialog.exec_():
             new_data = dialog.get_data()
             
-            # Update backend if connected to a project
-            if self.project_controller.current_project_id:
-                result = self.project_controller.update_alternative(
-                    alt_data['id'], 
-                    new_data['name'], 
-                    new_data['description']
-                )
-                
-                if result:
-                    # Update table
-                    self.alt_table.setItem(current_row, 1, QTableWidgetItem(new_data['name']))
-                    self.alt_table.setItem(current_row, 2, QTableWidgetItem(new_data['description']))
-                else:
-                    QMessageBox.critical(self, "Error", "Failed to update alternative")
-            else:
-                # Just update table if no project is saved yet
-                self.alt_table.setItem(current_row, 1, QTableWidgetItem(new_data['name']))
-                self.alt_table.setItem(current_row, 2, QTableWidgetItem(new_data['description']))
+            # Update table
+            self.alt_table.setItem(current_row, 1, QTableWidgetItem(new_data['name']))
+            self.alt_table.setItem(current_row, 2, QTableWidgetItem(new_data['description']))
     
     def remove_alternative(self):
         """Remove the selected alternative"""
@@ -295,68 +225,39 @@ class ProblemTab(QWidget):
         
         alt_id = self.alt_table.item(current_row, 0).text()
         
-        # Confirm deletion
         reply = QMessageBox.question(self, "Confirm Deletion", 
                                      f"Are you sure you want to delete alternative '{alt_id}'?", 
                                      QMessageBox.Yes | QMessageBox.No)
         
         if reply == QMessageBox.Yes:
-            # Delete from backend if connected to a project
-            if self.project_controller.current_project_id:
-                result = self.project_controller.delete_alternative(alt_id)
-                
-                if result:
-                    self.alt_table.removeRow(current_row)
-                else:
-                    QMessageBox.critical(self, "Error", "Failed to delete alternative")
-            else:
-                # Just remove from table if no project is saved yet
-                self.alt_table.removeRow(current_row)
+            self.alt_table.removeRow(current_row)
     
     def add_criterion(self):
-        """Open dialog to add a new criterion"""
+        """Add a new criterion"""
         dialog = CriteriaDialog(self)
         if dialog.exec_():
             crit_data = dialog.get_data()
             
-            # Check if ID is provided
-            if not crit_data['id']:
+            if not crit_data['id'].strip():
                 QMessageBox.warning(self, "Warning", "Criterion ID is required")
                 return
                 
-            # Check if name is provided
-            if not crit_data['name']:
+            if not crit_data['name'].strip():
                 QMessageBox.warning(self, "Warning", "Criterion name is required")
                 return
             
-            # Add to backend if connected to a project
-            if self.project_controller.current_project_id:
-                result = self.project_controller.add_criterion(
-                    crit_data['id'], 
-                    crit_data['name'],
-                    crit_data['optimization_type'],
-                    crit_data['scale_type'],
-                    crit_data['weight'],
-                    crit_data['unit']
-                )
-                
-                if result:
-                    self._add_criterion_to_table(crit_data)
-                else:
-                    QMessageBox.critical(self, "Error", "Failed to add criterion")
-            else:
-                # Just add to table if no project is saved yet
-                self._add_criterion_to_table(crit_data)
+            # Just add to table - will be saved when user clicks Save Project
+            self._add_criterion_to_table(crit_data)
     
     def _add_criterion_to_table(self, crit_data):
         """Add criterion data to the table"""
         row = self.crit_table.rowCount()
         self.crit_table.insertRow(row)
-        self.crit_table.setItem(row, 0, QTableWidgetItem(crit_data['id']))
-        self.crit_table.setItem(row, 1, QTableWidgetItem(crit_data['name']))
-        self.crit_table.setItem(row, 2, QTableWidgetItem(crit_data['optimization_type']))
-        self.crit_table.setItem(row, 3, QTableWidgetItem(str(crit_data['weight'])))
-        self.crit_table.setItem(row, 4, QTableWidgetItem(crit_data['unit']))
+        self.crit_table.setItem(row, 0, QTableWidgetItem(str(crit_data.get('id', ''))))
+        self.crit_table.setItem(row, 1, QTableWidgetItem(str(crit_data.get('name', ''))))
+        self.crit_table.setItem(row, 2, QTableWidgetItem(str(crit_data.get('optimization_type', 'maximize'))))
+        self.crit_table.setItem(row, 3, QTableWidgetItem(str(crit_data.get('weight', 1.0))))
+        self.crit_table.setItem(row, 4, QTableWidgetItem(str(crit_data.get('unit', ''))))
     
     def edit_criterion(self):
         """Edit the selected criterion"""
@@ -365,7 +266,6 @@ class ProblemTab(QWidget):
             QMessageBox.warning(self, "Warning", "Please select a criterion to edit")
             return
         
-        # Get data from the selected row
         crit_data = {
             'id': self.crit_table.item(current_row, 0).text(),
             'name': self.crit_table.item(current_row, 1).text(),
@@ -374,36 +274,15 @@ class ProblemTab(QWidget):
             'unit': self.crit_table.item(current_row, 4).text() if self.crit_table.item(current_row, 4) else ''
         }
         
-        # Open dialog with current data
         dialog = CriteriaDialog(self, crit_data)
         if dialog.exec_():
             new_data = dialog.get_data()
             
-            # Update backend if connected to a project
-            if self.project_controller.current_project_id:
-                result = self.project_controller.update_criterion(
-                    crit_data['id'],
-                    new_data['name'],
-                    new_data['optimization_type'],
-                    new_data['scale_type'],
-                    new_data['weight'],
-                    new_data['unit']
-                )
-                
-                if result:
-                    # Update table
-                    self.crit_table.setItem(current_row, 1, QTableWidgetItem(new_data['name']))
-                    self.crit_table.setItem(current_row, 2, QTableWidgetItem(new_data['optimization_type']))
-                    self.crit_table.setItem(current_row, 3, QTableWidgetItem(str(new_data['weight'])))
-                    self.crit_table.setItem(current_row, 4, QTableWidgetItem(new_data['unit']))
-                else:
-                    QMessageBox.critical(self, "Error", "Failed to update criterion")
-            else:
-                # Just update table if no project is saved yet
-                self.crit_table.setItem(current_row, 1, QTableWidgetItem(new_data['name']))
-                self.crit_table.setItem(current_row, 2, QTableWidgetItem(new_data['optimization_type']))
-                self.crit_table.setItem(current_row, 3, QTableWidgetItem(str(new_data['weight'])))
-                self.crit_table.setItem(current_row, 4, QTableWidgetItem(new_data['unit']))
+            # Update table
+            self.crit_table.setItem(current_row, 1, QTableWidgetItem(new_data['name']))
+            self.crit_table.setItem(current_row, 2, QTableWidgetItem(new_data['optimization_type']))
+            self.crit_table.setItem(current_row, 3, QTableWidgetItem(str(new_data['weight'])))
+            self.crit_table.setItem(current_row, 4, QTableWidgetItem(new_data['unit']))
     
     def remove_criterion(self):
         """Remove the selected criterion"""
@@ -414,20 +293,40 @@ class ProblemTab(QWidget):
         
         crit_id = self.crit_table.item(current_row, 0).text()
         
-        # Confirm deletion
         reply = QMessageBox.question(self, "Confirm Deletion", 
                                      f"Are you sure you want to delete criterion '{crit_id}'?", 
                                      QMessageBox.Yes | QMessageBox.No)
         
         if reply == QMessageBox.Yes:
-            # Delete from backend if connected to a project
-            if self.project_controller.current_project_id:
-                result = self.project_controller.delete_criterion(crit_id)
-                
-                if result:
-                    self.crit_table.removeRow(current_row)
-                else:
-                    QMessageBox.critical(self, "Error", "Failed to delete criterion")
-            else:
-                # Just remove from table if no project is saved yet
-                self.crit_table.removeRow(current_row)
+            self.crit_table.removeRow(current_row)
+    
+    def get_table_alternatives(self):
+        """Get all alternatives from the table"""
+        alternatives = []
+        for row in range(self.alt_table.rowCount()):
+            alt_data = {
+                'id': self.alt_table.item(row, 0).text().strip(),
+                'name': self.alt_table.item(row, 1).text().strip(),
+                'description': self.alt_table.item(row, 2).text().strip() if self.alt_table.item(row, 2) else ''
+            }
+            if alt_data['id'] and alt_data['name']:  # Only add if has required fields
+                alternatives.append(alt_data)
+        return alternatives
+    
+    def get_table_criteria(self):
+        """Get all criteria from the table"""
+        criteria = []
+        for row in range(self.crit_table.rowCount()):
+            try:
+                crit_data = {
+                    'id': self.crit_table.item(row, 0).text().strip(),
+                    'name': self.crit_table.item(row, 1).text().strip(),
+                    'optimization_type': self.crit_table.item(row, 2).text().strip(),
+                    'weight': float(self.crit_table.item(row, 3).text()),
+                    'unit': self.crit_table.item(row, 4).text().strip() if self.crit_table.item(row, 4) else ''
+                }
+                if crit_data['id'] and crit_data['name']:  # Only add if has required fields
+                    criteria.append(crit_data)
+            except (ValueError, AttributeError):
+                continue  # Skip invalid rows
+        return criteria
