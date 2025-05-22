@@ -121,15 +121,17 @@ class ProblemTab(QWidget):
                 self.is_loading = False
     
     def _refresh_tables(self):
-        """Refresh both tables with current data from backend"""
         # Load alternatives
+        
         alternatives = self.project_controller.get_alternatives()
+        
         self.alt_table.setRowCount(0)
         for alt in alternatives:
             self._add_alternative_to_table(alt)
         
         # Load criteria
         criteria = self.project_controller.get_criteria()
+        
         self.crit_table.setRowCount(0)
         for crit in criteria:
             self._add_criterion_to_table(crit)
@@ -158,14 +160,28 @@ class ProblemTab(QWidget):
                     QMessageBox.critical(self, "Error", "Failed to update project")
                     return
             
-            # Step 2: Save the complete project
-            success = self.project_controller.save_complete_project()
+            # Step 2: Get data from tables
+            alternatives = self.get_table_alternatives()
+            criteria = self.get_table_criteria()
+            
+            # Step 3: Save the complete project with table data
+            success = self.project_controller.save_complete_project(alternatives, criteria)
             if success:
                 QMessageBox.information(self, "Success", "Project saved successfully")
                 self._refresh_tables()  # Refresh to show any backend changes
+                
+                # NUEVO: Notificar a la ventana principal que el proyecto cambió
+                main_window = self.parent()
+                while main_window and not hasattr(main_window, 'project_changed'):
+                    main_window = main_window.parent()
+                
+                if main_window and hasattr(main_window, 'project_changed'):
+                    main_window.project_changed()
             else:
                 QMessageBox.critical(self, "Error", "Failed to save project completely")
-                
+
+            
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Unexpected error: {str(e)}")
             print(f"Save error: {str(e)}")

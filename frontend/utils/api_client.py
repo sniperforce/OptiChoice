@@ -60,10 +60,19 @@ class ApiClient:
             print(f"Error deleting project: {e}")
             return False
 
-    def save_project_complete(self, project_id):
+    def save_project_complete(self, project_id, alternatives=None, criteria=None):
         """Save complete project with all components"""
         try:
-            response = self.session.post(f"{self.base_url}/projects/{project_id}/save-complete")
+            data = {}
+            if alternatives:
+                data['alternatives'] = alternatives
+            if criteria:
+                data['criteria'] = criteria
+                
+            response = self.session.post(
+                f"{self.base_url}/projects/{project_id}/save-complete",
+                json=data
+            )
             return response.status_code == 200
         except Exception as e:
             print(f"Error saving complete project: {e}")

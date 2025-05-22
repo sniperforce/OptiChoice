@@ -33,9 +33,8 @@ class MCDMApplication(QMainWindow):
         
         # Initialize tabs
         self.init_tabs()
-        
-        # Initialize toolbar
-        self.create_toolbar()
+
+        self.tab_widget.currentChanged.connect(self.on_tab_changed)
         
     def create_menu_bar(self):
         # File menu
@@ -217,41 +216,9 @@ class MCDMApplication(QMainWindow):
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
         
-    def create_toolbar(self):
-        # Create main toolbar
-        self.toolbar = QToolBar("Main Toolbar")
-        self.toolbar.setIconSize(QSize(32, 32))
-        self.addToolBar(Qt.LeftToolBarArea, self.toolbar)
-        
-        # Add actions to toolbar
-        new_action = QAction("New", self)
-        new_action.triggered.connect(self.new_project)
-        self.toolbar.addAction(new_action)
-        
-        open_action = QAction("Open", self)
-        open_action.triggered.connect(self.open_project)
-        self.toolbar.addAction(open_action)
-        
-        save_action = QAction("Save", self)
-        save_action.triggered.connect(self.save_project)
-        self.toolbar.addAction(save_action)
-        
-        self.toolbar.addSeparator()
-        
-        matrix_action = QAction("Matrix", self)
-        matrix_action.triggered.connect(self.edit_matrix)
-        self.toolbar.addAction(matrix_action)
-        
-        run_action = QAction("Run", self)
-        run_action.triggered.connect(self.run_selected_method)
-        self.toolbar.addAction(run_action)
-        
-        results_action = QAction("Results", self)
-        results_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(3))
-        self.toolbar.addAction(results_action)
-        
     def init_tabs(self):
         from views.tabs.problem_tab import ProblemTab
+        from views.tabs.matrix_tab import MatrixTab 
 
         self.project_controller = ProjectController()
         # Problem Definition tab
@@ -259,7 +226,7 @@ class MCDMApplication(QMainWindow):
         self.tab_widget.addTab(self.problem_tab, "Problem Definition")
         
         # Decision Matrix tab
-        self.matrix_tab = QWidget()
+        self.matrix_tab = MatrixTab(self.project_controller)
         self.tab_widget.addTab(self.matrix_tab, "Decision Matrix")
         
         # Method Selection tab
@@ -278,12 +245,33 @@ class MCDMApplication(QMainWindow):
         self.sensitivity_tab = QWidget()
         self.tab_widget.addTab(self.sensitivity_tab, "Sensitivity Analysis")
     
+    def on_tab_changed(self, index):
+        """Handle tab changes to sync data"""
+        if index == 1:  # Decision Matrix tab
+            # MEJORADO: Siempre actualizar la matriz cuando se cambia a esta pestaña
+            if hasattr(self, 'matrix_tab'):
+                self.matrix_tab.load_matrix_data()
+        
+        # Actualizar status bar según la pestaña
+        tab_names = ["Project Manager", "Decision Matrix", "Method Selection", "Results", "Visualization", "Sensitivity Analysis"]
+        if index < len(tab_names):
+            self.statusBar.showMessage(f"Current tab: {tab_names[index]}")
+
+    def project_changed(self):
+        """Call this method whenever the project changes"""
+        # Actualizar todas las pestañas que dependen del proyecto
+        if hasattr(self, 'matrix_tab'):
+            self.matrix_tab.load_matrix_data()
+
     # File menu actions
     def new_project(self):
         self.statusBar.showMessage("Creating new project...")
         
         # Clear the current project
         self.project_controller.current_project_id = None
+        
+        # NUEVO: Cambiar automáticamente a la pestaña Project Manager
+        self.tab_widget.setCurrentIndex(0)  # Project Manager es la pestaña 0
         
         # Reset the problem tab
         self.problem_tab.name_edit.clear()
@@ -292,32 +280,53 @@ class MCDMApplication(QMainWindow):
         self.problem_tab.alt_table.setRowCount(0)
         self.problem_tab.crit_table.setRowCount(0)
         
+        # NUEVO: También limpiar la matriz
+        if hasattr(self, 'matrix_tab'):
+            self.matrix_tab.load_matrix_data()
+        
         self.statusBar.showMessage("New project created")
         
     def open_project(self):
-        self.statusBar.showMessage("Opening project...")
+        """Open project using professional project list dialog"""
+        self.statusBar.showMessage("Loading projects...")
         
-        # Show file dialog to select project file
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Open Project", "", "All Files (*)")
-        
-        if file_path:
-            # Extract project_id from file (this will depend on your implementation)
-            # For now, assuming a simple implementation
-            import os
-            project_id = os.path.basename(file_path).split('.')[0]
+        try:
+            # Import the new dialog
+            from views.dialogs.project_list_dialog import ProjectListDialog
             
-            # Load the project
-            project = self.project_controller.load_project(project_id)
+            # Create and show the dialog
+            dialog = ProjectListDialog(self.project_controller, self)
             
-            if project:
-                # Refresh the problem tab with the loaded project
-                self.problem_tab.load_project_data()
-                self.statusBar.showMessage(f"Project '{project.get('name', '')}' loaded successfully")
+            if dialog.exec_() == dialog.Accepted:
+                project_id = dialog.get_selected_project_id()
+                
+                if project_id:
+                    # Load the selected project
+                    project = self.project_controller.load_project(project_id)
+                    
+                    if project:
+                        # NUEVO: Cambiar automáticamente a la pestaña Project Manager
+                        self.tab_widget.setCurrentIndex(0)  # Project Manager es la pestaña 0
+                        
+                        # Refresh the problem tab with the loaded project
+                        self.problem_tab.load_project_data()
+                        
+                        # NUEVO: También actualizar la matriz automáticamente
+                        if hasattr(self, 'matrix_tab'):
+                            self.matrix_tab.load_matrix_data()
+                        
+                        self.statusBar.showMessage(f"Project '{project.get('name', '')}' loaded successfully")
+                    else:
+                        QMessageBox.critical(self, "Error", "Failed to load the selected project")
+                        self.statusBar.showMessage("Failed to load project")
+                else:
+                    self.statusBar.showMessage("No project selected")
             else:
-                QMessageBox.critical(self, "Error", "Failed to load project")
-                self.statusBar.showMessage("Failed to load project")
-
+                self.statusBar.showMessage("Open project cancelled")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error opening project dialog: {str(e)}")
+            self.statusBar.showMessage("Error opening project dialog")
         
     def save_project(self):
         self.statusBar.showMessage("Saving project...")

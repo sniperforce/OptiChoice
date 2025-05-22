@@ -43,17 +43,16 @@ class ProjectController:
         
         return self.api_client.update_project(self.current_project_id, data)
     
-    def save_complete_project(self):
+    def save_complete_project(self, alternatives=None, criteria=None):
         """Save the complete project with all data from UI"""
         if not self.current_project_id:
             return False
         
-        # Get data from the problem tab
-        from views.main_window import MCDMApplication
-        # This is a bit hacky but necessary to get the table data
-        # In a better architecture, we'd pass this data as parameters
-        
-        return self.api_client.save_project_complete(self.current_project_id)
+        return self.api_client.save_project_complete(
+            self.current_project_id, 
+            alternatives=alternatives, 
+            criteria=criteria
+        )
 
     def get_all_projects(self):
         """Get all projects"""
@@ -76,13 +75,21 @@ class ProjectController:
     
     def get_alternatives(self):
         """Get alternatives for current project"""
+        print(f"DEBUG: get_alternatives called with project_id: {self.current_project_id}")
+        
         if not self.current_project_id:
+            print("DEBUG: No current project ID")
             return []
         
-        return self.api_client.get_alternatives(self.current_project_id)
+        result = self.api_client.get_alternatives(self.current_project_id)
+        print(f"DEBUG: API returned alternatives: {result}")
+        return result
     
     def get_criteria(self):
-        """Get criteria for current project"""
+        print(f"DEBUG: get_criteria called with project_id: {self.current_project_id}")
+        
         if not self.current_project_id:
             return []
-        return self.api_client.get_criteria(self.current_project_id)
+            
+        result = self.api_client.get_criteria(self.current_project_id)
+        return result

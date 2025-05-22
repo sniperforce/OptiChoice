@@ -94,18 +94,55 @@ def get_project(project_id):
 
 @app.route('/api/projects/<project_id>/save-complete', methods=['POST'])
 def save_project_complete(project_id):
-    """Save a complete project with data from the frontend"""
+    """Save a complete project with alternatives and criteria from frontend"""
     try:
         # Load the project
         project = controller.load_project(project_id)
         if project is None:
             return jsonify({'error': f"Project {project_id} not found"}), 404
         
-        # Get data from request if provided (for future use)
-        data = request.json if request.json else {}
+        # Get data from request safely
+        data = {}
+        try:
+            if request.is_json:
+                data = request.json or {}
+        except Exception:
+            data = {}
         
-        # For now, just save the project as-is
-        # In the future, we can add alternatives and criteria from the request data
+        # If alternatives and criteria are provided, update the project
+        if 'alternatives' in data:
+            # Remove existing alternatives first
+            for alt in list(project.alternatives):
+                controller.remove_alternative(alt.id)
+            
+            # Add new alternatives
+            for alt_data in data['alternatives']:
+                controller.add_alternative(
+                    id=alt_data['id'],
+                    name=alt_data['name'],
+                    description=alt_data.get('description', ''),
+                    metadata=alt_data.get('metadata', {})
+                )
+        
+        if 'criteria' in data:
+            # Remove existing criteria first
+            for crit in list(project.criteria):
+                controller.remove_criteria(crit.id)
+            
+            # Add new criteria
+            for crit_data in data['criteria']:
+                controller.add_criteria(
+                    id=crit_data['id'],
+                    name=crit_data['name'],
+                    description=crit_data.get('description', ''),
+                    optimization_type=crit_data.get('optimization_type', 'maximize'),
+                    scale_type=crit_data.get('scale_type', 'quantitative'),
+                    weight=float(crit_data.get('weight', 1.0)),
+                    unit=crit_data.get('unit', ''),
+                    metadata=crit_data.get('metadata', {})
+                )
+        
+        # Try to save the project
         try:
             controller.save_project()
             return jsonify({'success': True, 'message': 'Project saved successfully'}), 200
@@ -192,6 +229,15 @@ def get_alternative(project_id, alternative_id):
         controller.load_project(project_id)
         alternative = controller.get_alternative(alternative_id)
         return jsonify(alternative)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
+
+@app.route('/api/projects/<project_id>/alternatives', methods=['GET'])
+def get_alternatives(project_id):
+    try:
+        controller.load_project(project_id)
+        alternatives = controller.get_all_alternatives()
+        return jsonify(alternatives)
     except Exception as e:
         return jsonify({'error': str(e)}), 404
 

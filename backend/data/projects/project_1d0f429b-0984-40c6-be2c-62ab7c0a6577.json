@@ -1,0 +1,52 @@
+{
+  "id": "1d0f429b-0984-40c6-be2c-62ab7c0a6577",
+  "name": "Ventas",
+  "description": "mejores ventas",
+  "decision_maker": "Diego",
+  "created_at": "2025-05-21T21:28:53.204363",
+  "updated_at": "2025-05-21T21:33:09.766819",
+  "alternatives": [
+    {
+      "id": "A1",
+      "name": "refrescos",
+      "description": "bebidas",
+      "metadata": {}
+    },
+    {
+      "id": "A2",
+      "name": "dulces",
+      "description": "tallas dulces",
+      "metadata": {}
+    },
+    {
+      "id": "A3",
+      "name": "cocaina",
+      "description": "rica",
+      "metadata": {}
+    }
+  ],
+  "criteria": [
+    {
+      "id": "C1",
+      "name": "ingresos generados",
+      "description": "",
+      "optimization_type": "maximize",
+      "scale_type": "quantitative",
+      "weight": 0.5000000000000001,
+      "unit": "$",
+      "metadata": {}
+    },
+    {
+      "id": "C2",
+      "name": "costo",
+      "description": "",
+      "optimization_type": "minimize",
+      "scale_type": "quantitative",
+      "weight": 1.0,
+      "unit": "$",
+      "metadata": {}
+    }
+  ],
+  "metadata": {},
+  "results": {}
+}
