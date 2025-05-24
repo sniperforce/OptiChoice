@@ -93,3 +93,31 @@ class ProjectController:
             
         result = self.api_client.get_criteria(self.current_project_id)
         return result
+    
+    def get_decision_matrix(self):
+        """Get decision matrix for current project"""
+        if not self.current_project_id:
+            return {}
+        return self.api_client.get_decision_matrix(self.current_project_id)
+
+    def save_decision_matrix(self, matrix_data, criteria_config):
+        """Save decision matrix for current project"""
+        if not self.current_project_id:
+            return False
+        return self.api_client.save_decision_matrix(
+            self.current_project_id, matrix_data, criteria_config
+        )
+
+    def create_decision_matrix(self, name=None, values=None):
+        """Create decision matrix for current project"""
+        if not self.current_project_id:
+            return None
+        return self.api_client.create_decision_matrix(
+            self.current_project_id, name, values
+        )
+
+    def update_matrix_values(self, updates):
+        """Update matrix values for current project"""
+        if not self.current_project_id:
+            return False
+        return self.api_client.update_matrix_values(self.current_project_id, updates)

@@ -269,9 +269,51 @@ class MainController:
         except ValueError as e:
             raise ValueError(f"Error removing criterion: {str(e)}")
     
-    def create_decision_matrix(self, name: Optional[str] = None,
-                             values: Optional[List[List[float]]] = None) -> Dict[str, Any]:
+    def get_decision_matrix(self) -> Dict[str, Any]:
+        """Get the decision matrix for the current project"""
+        if self._current_project is None:
+            raise ValueError("There is no current project")
+
+        if self._current_project.decision_matrix is None:
+            raise ValueError("The project has no decision matrix")
         
+        matrix = self._current_project.decision_matrix
+
+        result = {
+            'name': matrix.name,
+            'shape': matrix.shape,
+            'alternatives': [
+                {'id': alt.id, 'name': alt.name}
+                for alt in matrix.alternative
+            ],
+            'criteria': [
+                {
+                    'id': crit.id, 
+                    'name': crit.name,
+                    'optimization_type': crit.optimization_type.value,
+                    'weight': crit.weight
+                }
+                for crit in matrix.criteria
+            ],
+            'values': matrix.values.tolist(),
+            'matrix_data': {},  # Will be populated with actual data
+            'criteria_config': {}  # Will be populated with config
+        }
+        
+        # Extract matrix data in the format expected by frontend
+        matrix_data = {}
+        for i, alt in enumerate(matrix.alternative):
+            for j, crit in enumerate(matrix.criteria):
+                key = f"{alt.id}_{crit.id}"
+                matrix_data[key] = str(matrix.values[i, j])
+        
+        result['matrix_data'] = matrix_data
+        
+        return result
+
+    def create_decision_matrix(self, name: Optional[str] = None, 
+                         values: Optional[List[List[float]]] = None) -> Dict[str, Any]:
+        """Create a decision matrix for the current project"""
         if self._current_project is None:
             raise ValueError("There is no current project")
         
@@ -290,8 +332,13 @@ class MainController:
         }
     
     def set_matrix_value(self, alternative_id: str, criteria_id: str, value: float) -> None:
+        """Set a specific value in the decision matrix"""
         if self._current_project is None:
             raise ValueError("There is no current project")
+        
+        # Create matrix if it doesn't exist
+        if self._current_project.decision_matrix is None:
+            self.create_decision_matrix()
         
         self._decision_service.set_matrix_value(
             project=self._current_project,
@@ -300,35 +347,53 @@ class MainController:
             value=value
         )
     
-    def get_decision_matrix(self) -> Dict[str, Any]:
-        if self._current_project is None:
-            raise ValueError("There is no current project")
-    
-        if self._current_project.decision_matrix is None:
-            raise ValueError("The project has no decision matrix")
-        
-        matrix = self._current_project.decision_matrix
-    
-        result = {
-            'name': matrix.name,
-            'shape': matrix.shape,
-            'alternatives': [
-                {'id': alt.id, 'name': alt.name}
-                for alt in matrix.alternative
-            ],
-            'criteria': [
-                {
-                    'id': crit.id, 
-                    'name': crit.name,
-                    'optimization_type': crit.optimization_type.value,
-                    'weight': crit.weight
-                }
-                for crit in matrix.criteria
-            ],
-            'values': matrix.values.tolist()
-        }
-        
-        return result
+    def save_decision_matrix(self, matrix_data: Dict[str, str], criteria_config: Dict[str, Dict]) -> bool:
+        """Save decision matrix data and configuration"""
+        try:
+            if self._current_project is None:
+                raise ValueError("There is no current project")
+            
+            # Create decision matrix if it doesn't exist
+            if self._current_project.decision_matrix is None:
+                self.create_decision_matrix()
+            
+            matrix = self._current_project.decision_matrix
+            
+            # Update matrix values from matrix_data
+            for key, value in matrix_data.items():
+                if '_' in key and value.strip():
+                    try:
+                        alt_id, crit_id = key.split('_', 1)
+                        
+                        # Find indices
+                        alt_idx = None
+                        for i, alt in enumerate(matrix.alternative):
+                            if alt.id == alt_id:
+                                alt_idx = i
+                                break
+                        
+                        crit_idx = None
+                        for j, crit in enumerate(matrix.criteria):
+                            if crit.id == crit_id:
+                                crit_idx = j
+                                break
+                        
+                        if alt_idx is not None and crit_idx is not None:
+                            matrix.set_values(alt_idx, crit_idx, float(value))
+                            
+                    except (ValueError, IndexError) as e:
+                        print(f"Error setting matrix value for {key}: {e}")
+                        continue
+            
+            # Save criteria configuration as metadata
+            if criteria_config:
+                self._current_project.set_metadata('criteria_config', criteria_config)
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error saving decision matrix: {e}")
+            return False
     
     def get_available_methods(self) -> List[Dict[str, Any]]:
         method_names = self._decision_service.get_available_methods()

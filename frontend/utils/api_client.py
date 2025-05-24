@@ -95,3 +95,59 @@ class ApiClient:
         except Exception as e:
             print(f"Error getting criteria: {e}")
             return []
+
+    def get_decision_matrix(self, project_id):
+        """Get decision matrix for a project"""
+        try:
+            response = self.session.get(f"{self.base_url}/projects/{project_id}/matrix")
+            return response.json() if response.status_code == 200 else {}
+        except Exception as e:
+            print(f"Error getting decision matrix: {e}")
+            return {}
+
+    def save_decision_matrix(self, project_id, matrix_data, criteria_config):
+        """Save decision matrix for a project"""
+        try:
+            data = {
+                'matrix_data': matrix_data,
+                'criteria_config': criteria_config
+            }
+            response = self.session.post(
+                f"{self.base_url}/projects/{project_id}/matrix",
+                json=data
+            )
+            return response.status_code == 200
+        except Exception as e:
+            print(f"Error saving decision matrix: {e}")
+            return False
+
+    def create_decision_matrix(self, project_id, name=None, values=None):
+        """Create a new decision matrix"""
+        try:
+            data = {}
+            if name:
+                data['name'] = name
+            if values:
+                data['values'] = values
+                
+            response = self.session.post(
+                f"{self.base_url}/projects/{project_id}/matrix/create",
+                json=data
+            )
+            return response.json() if response.status_code == 201 else None
+        except Exception as e:
+            print(f"Error creating decision matrix: {e}")
+            return None
+
+    def update_matrix_values(self, project_id, updates):
+        """Update specific matrix values"""
+        try:
+            data = {'updates': updates}
+            response = self.session.put(
+                f"{self.base_url}/projects/{project_id}/matrix/values",
+                json=data
+            )
+            return response.status_code == 200
+        except Exception as e:
+            print(f"Error updating matrix values: {e}")
+            return False

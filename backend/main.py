@@ -262,49 +262,107 @@ def get_criteria_by_id(project_id, criteria_id):
 
 # Routes for decision matrix
 @app.route('/api/projects/<project_id>/matrix', methods=['GET'])
-def get_matrix(project_id):
+def get_decision_matrix(project_id):
+    """Get the decision matrix for a project"""
     try:
         controller.load_project(project_id)
-        matrix = controller.get_decision_matrix()
-        return jsonify(matrix)
+        matrix_data = controller.get_decision_matrix()
+        return jsonify(matrix_data)
+    except ValueError as e:
+        # Matrix doesn't exist yet - return empty structure
+        return jsonify({
+            'matrix_data': {},
+            'criteria_config': {},
+            'message': str(e)
+        }), 200  # Not an error, just no matrix yet
     except Exception as e:
-        return jsonify({'error': str(e)}), 404
+        return jsonify({'error': str(e)}), 500
 
-@app.route('/api/projects/<project_id>/matrix', methods=['POST'])
-def create_matrix(project_id):
+@app.route('/api/projects/<project_id>/matrix/create', methods=['POST'])
+def create_decision_matrix(project_id):
+    """Create a new decision matrix for a project"""
     try:
         controller.load_project(project_id)
         
-        data = request.json
+        data = request.json if request.json else {}
+        
         matrix = controller.create_decision_matrix(
-            name=data.get('name'),
+            name=data.get('name', f"Matrix for Project {project_id}"),
             values=data.get('values')
         )
         
         controller.save_project()
         
-        return jsonify(matrix), 201
+        return jsonify({
+            'success': True,
+            'matrix': matrix
+        }), 201
+        
     except Exception as e:
+        print(f"Error creating decision matrix: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/projects/<project_id>/matrix/value', methods=['POST'])
-def set_matrix_value(project_id):
+@app.route('/api/projects/<project_id>/matrix', methods=['POST'])
+def save_decision_matrix(project_id):
+    """Save the decision matrix for a project"""
     try:
         controller.load_project(project_id)
         
-        data = request.json
-        controller.set_matrix_value(
-            alternative_id=data.get('alternative_id'),
-            criteria_id=data.get('criteria_id'),
-            value=float(data.get('value', 0.0))
+        data = request.json if request.json else {}
+        
+        # Save matrix data
+        success = controller.save_decision_matrix(
+            matrix_data=data.get('matrix_data', {}),
+            criteria_config=data.get('criteria_config', {})
         )
+        
+        if success:
+            controller.save_project()
+            return jsonify({'success': True, 'message': 'Matrix saved successfully'}), 200
+        else:
+            return jsonify({'error': 'Failed to save matrix'}), 500
+            
+    except Exception as e:
+        print(f"Error saving decision matrix: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/projects/<project_id>/matrix/values', methods=['PUT'])
+def update_matrix_values(project_id):
+    """Update specific values in the decision matrix"""
+    try:
+        controller.load_project(project_id)
+        
+        data = request.json if request.json else {}
+        
+        # Create matrix if it doesn't exist
+        try:
+            controller.get_decision_matrix()
+        except ValueError:
+            # Matrix doesn't exist, create it
+            controller.create_decision_matrix()
+        
+        # Update individual matrix values
+        for update in data.get('updates', []):
+            controller.set_matrix_value(
+                alternative_id=update.get('alternative_id'),
+                criteria_id=update.get('criteria_id'),
+                value=float(update.get('value', 0.0))
+            )
         
         controller.save_project()
         
-        return '', 204
+        return jsonify({'success': True, 'message': 'Matrix values updated'}), 200
+        
     except Exception as e:
+        print(f"Error updating matrix values: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
+    
 # Routes for MCDM methods
 @app.route('/api/methods', methods=['GET'])
 def get_methods():
