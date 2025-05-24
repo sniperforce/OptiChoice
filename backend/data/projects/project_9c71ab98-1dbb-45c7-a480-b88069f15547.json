@@ -1,0 +1,67 @@
+{
+  "id": "9c71ab98-1dbb-45c7-a480-b88069f15547",
+  "name": "ventas",
+  "description": "vendederas",
+  "decision_maker": "Diego",
+  "created_at": "2025-05-23T21:54:16.414703",
+  "updated_at": "2025-05-23T21:56:17.540357",
+  "alternatives": [
+    {
+      "id": "A1",
+      "name": "vapers",
+      "description": "fumar",
+      "metadata": {}
+    }
+  ],
+  "criteria": [
+    {
+      "id": "C1",
+      "name": "costoo",
+      "description": "",
+      "optimization_type": "maximize",
+      "scale_type": "quantitative",
+      "weight": 1.0,
+      "unit": "",
+      "metadata": {}
+    }
+  ],
+  "metadata": {
+    "criteria_config": {
+      "C1": {
+        "scale_type": "Numeric (Continuous)",
+        "min_value": 0.0,
+        "max_value": 100.0,
+        "unit": ""
+      }
+    }
+  },
+  "results": {},
+  "decision_matrix": {
+    "name": "Matriz de ventas",
+    "alternatives": [
+      {
+        "id": "A1",
+        "name": "vapers",
+        "description": "fumar",
+        "metadata": {}
+      }
+    ],
+    "criteria": [
+      {
+        "id": "C1",
+        "name": "costoo",
+        "description": "",
+        "optimization_type": "maximize",
+        "scale_type": "quantitative",
+        "weight": 1.0,
+        "unit": "",
+        "metadata": {}
+      }
+    ],
+    "values": [
+      [
+        50.0
+      ]
+    ]
+  }
+}

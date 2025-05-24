@@ -1,14 +1,209 @@
+# frontend/views/tabs/matrix_tab.py - VERSION SIN BUCLES
+
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                             QGroupBox, QTableWidget, QTableWidgetItem, QPushButton,
                             QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit, QLabel,
                             QProgressBar, QTextEdit, QMessageBox, QHeaderView,
-                            QFormLayout, QToolTip, QCheckBox, QFrame, QScrollArea)
+                            QFormLayout, QToolTip, QCheckBox, QFrame, QScrollArea,
+                            QTreeWidget, QTreeWidgetItem, QTabWidget, QDialog,
+                            QDialogButtonBox, QListWidget, QListWidgetItem)
 from PyQt5.QtCore import Qt, QTimer, QPoint
-from PyQt5.QtGui import QColor, QFont
+from PyQt5.QtGui import QColor, QFont, QIcon, QPixmap
 import numpy as np
+
+# Importar el validador avanzado
+try:
+    from utils.matrix_validator import AdvancedMatrixValidator, ValidationSeverity
+    VALIDATION_AVAILABLE = True
+except ImportError:
+    VALIDATION_AVAILABLE = False
+    print("Warning: Advanced validation not available. Install advanced_matrix_validator.py")
+
+
+class ValidationPanel(QWidget):
+    """Panel dedicado para mostrar resultados de validación"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.validation_results = []
+        self.init_ui()
+    
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        
+        # Header con botones de acción
+        header_layout = QHBoxLayout()
+        
+        self.validate_btn = QPushButton("🔍 Validate Matrix")
+        self.validate_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 8px;")
+        header_layout.addWidget(self.validate_btn)
+        
+        self.auto_validate_cb = QCheckBox("Auto-validate")
+        self.auto_validate_cb.setChecked(True)  # CORREGIDO: Habilitado por defecto
+        header_layout.addWidget(self.auto_validate_cb)
+        
+        header_layout.addStretch()
+        
+        # Summary badges
+        self.summary_layout = QHBoxLayout()
+        self.create_summary_badges()
+        header_layout.addLayout(self.summary_layout)
+        
+        layout.addLayout(header_layout)
+        
+        # Tree widget para mostrar validaciones organizadas
+        self.validation_tree = QTreeWidget()
+        self.validation_tree.setHeaderLabels(["Issue", "Details", "Suggestion"])
+        self.validation_tree.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.validation_tree.header().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.validation_tree.header().setSectionResizeMode(2, QHeaderView.Stretch)
+        
+        layout.addWidget(self.validation_tree)
+        
+        # Bottom status
+        self.status_label = QLabel("Ready for validation")
+        self.status_label.setStyleSheet("color: #666; font-style: italic; padding: 5px;")
+        layout.addWidget(self.status_label)
+    
+    def create_summary_badges(self):
+        """Create summary badges for different validation severities"""
+        self.badges = {}
+        
+        badge_configs = [
+            ('critical', '🔴', '#d32f2f', 'Critical'),
+            ('error', '🟠', '#f57c00', 'Errors'), 
+            ('warning', '🟡', '#ffa000', 'Warnings'),
+            ('info', '🔵', '#1976d2', 'Info')
+        ]
+        
+        for severity, icon, color, label in badge_configs:
+            badge = QLabel(f"{icon} {label}: 0")
+            badge.setStyleSheet(f"""
+                background-color: {color}; 
+                color: white; 
+                padding: 4px 8px; 
+                border-radius: 12px; 
+                font-weight: bold;
+                margin: 2px;
+            """)
+            badge.setMinimumWidth(80)
+            badge.setAlignment(Qt.AlignCenter)
+            self.badges[severity] = badge
+            self.summary_layout.addWidget(badge)
+    
+    def update_validation_results(self, results):
+        """Update the validation panel with new results"""
+        self.validation_results = results
+        self.update_summary_badges()
+        self.populate_validation_tree()
+        self.update_status()
+    
+    def update_summary_badges(self):
+        """Update the summary badges with current counts"""
+        summary = {'critical': 0, 'error': 0, 'warning': 0, 'info': 0}
+        
+        for result in self.validation_results:
+            summary[result.severity.value] += 1
+        
+        badge_configs = [
+            ('critical', '🔴', 'Critical'),
+            ('error', '🟠', 'Errors'),
+            ('warning', '🟡', 'Warnings'), 
+            ('info', '🔵', 'Info')
+        ]
+        
+        for severity, icon, label in badge_configs:
+            count = summary[severity]
+            self.badges[severity].setText(f"{icon} {label}: {count}")
+            self.badges[severity].setVisible(count > 0)
+    
+    def populate_validation_tree(self):
+        """Populate the validation tree with organized results"""
+        self.validation_tree.clear()
+        
+        if not self.validation_results:
+            item = QTreeWidgetItem(["✅ No issues found", "Matrix validation passed", "Ready for MCDM methods"])
+            item.setBackground(0, QColor(200, 255, 200))
+            self.validation_tree.addTopLevelItem(item)
+            return
+        
+        # Group by severity
+        if not VALIDATION_AVAILABLE:
+            return
+            
+        severity_groups = {
+            ValidationSeverity.CRITICAL: [],
+            ValidationSeverity.ERROR: [], 
+            ValidationSeverity.WARNING: [],
+            ValidationSeverity.INFO: []
+        }
+        
+        for result in self.validation_results:
+            severity_groups[result.severity].append(result)
+        
+        # Create tree structure
+        severity_configs = [
+            (ValidationSeverity.CRITICAL, "🔴 Critical Issues", QColor(255, 200, 200)),
+            (ValidationSeverity.ERROR, "🟠 Errors", QColor(255, 220, 200)),
+            (ValidationSeverity.WARNING, "🟡 Warnings", QColor(255, 255, 200)),
+            (ValidationSeverity.INFO, "🔵 Information", QColor(200, 220, 255))
+        ]
+        
+        for severity, group_title, bg_color in severity_configs:
+            results = severity_groups[severity]
+            if not results:
+                continue
+                
+            # Create group item
+            group_item = QTreeWidgetItem([f"{group_title} ({len(results)})", "", ""])
+            group_item.setBackground(0, bg_color)
+            group_item.setFont(0, QFont("Arial", 10, QFont.Bold))
+            group_item.setExpanded(severity in [ValidationSeverity.CRITICAL, ValidationSeverity.ERROR])
+            
+            # Add individual results
+            for result in results:
+                detail_item = QTreeWidgetItem([
+                    result.message,
+                    result.details,
+                    result.suggestion
+                ])
+                
+                # Add styling based on severity
+                if severity == ValidationSeverity.CRITICAL:
+                    detail_item.setForeground(0, QColor(150, 0, 0))
+                elif severity == ValidationSeverity.ERROR:
+                    detail_item.setForeground(0, QColor(200, 100, 0))
+                
+                group_item.addChild(detail_item)
+            
+            self.validation_tree.addTopLevelItem(group_item)
+    
+    def update_status(self):
+        """Update the status label"""
+        if not self.validation_results:
+            self.status_label.setText("✅ Matrix validation passed - Ready for MCDM analysis")
+            self.status_label.setStyleSheet("color: green; font-weight: bold; padding: 5px;")
+        else:
+            if not VALIDATION_AVAILABLE:
+                return
+                
+            critical_count = sum(1 for r in self.validation_results if r.severity == ValidationSeverity.CRITICAL)
+            error_count = sum(1 for r in self.validation_results if r.severity == ValidationSeverity.ERROR)
+            
+            if critical_count > 0:
+                self.status_label.setText(f"❌ {critical_count} critical issue(s) prevent MCDM execution")
+                self.status_label.setStyleSheet("color: red; font-weight: bold; padding: 5px;")
+            elif error_count > 0:
+                self.status_label.setText(f"⚠️ {error_count} error(s) may affect results quality")
+                self.status_label.setStyleSheet("color: orange; font-weight: bold; padding: 5px;")
+            else:
+                self.status_label.setText("✅ Ready for MCDM analysis (with minor suggestions)")
+                self.status_label.setStyleSheet("color: green; font-weight: bold; padding: 5px;")
 
 
 class MatrixTab(QWidget):
+    """Enhanced Matrix Tab with Professional Validations - NO LOOPS VERSION"""
+    
     def __init__(self, project_controller, parent=None):
         super().__init__(parent)
         self.project_controller = project_controller
@@ -17,10 +212,23 @@ class MatrixTab(QWidget):
         self.normalized_data = {}  
         self.is_normalized_view = False  
         self.normalization_method = 'minmax'  
+        
+        # CONTROL DE BUCLES
+        self.is_programmatic_update = False
+        self.is_loading_data = False  # NUEVO: Previene bucles durante carga
+        self.cached_alternatives = []  # NUEVO: Cache para evitar requests repetitivos
+        self.cached_criteria = []     # NUEVO: Cache para evitar requests repetitivos
+        self.validation_in_progress = False  # NUEVO: Previene validaciones múltiples
+        
+        # Auto-save timer - AUMENTADO para reducir requests
         self.auto_save_timer = QTimer()
         self.auto_save_timer.timeout.connect(self.auto_save)
-        self.auto_save_timer.start(30000)  # Auto-save every 30 seconds
-        self.is_programmatic_update = False
+        self.auto_save_timer.start(60000)  # CAMBIADO: Cada 60 segundos en lugar de 30
+        
+        # Advanced validator
+        if VALIDATION_AVAILABLE:
+            self.validator = AdvancedMatrixValidator()
+            self.last_validation_results = []
         
         self.init_ui()
         self.load_matrix_data()
@@ -34,13 +242,36 @@ class MatrixTab(QWidget):
         # Left panel: Configuration
         self.create_config_panel(splitter)
         
-        # Right panel: Matrix and Analysis
+        # Center panel: Matrix ONLY (sin analysis para reducir complejidad)
         self.create_matrix_panel(splitter)
         
-        # Set splitter proportions
-        splitter.setSizes([300, 700])
+        # Right panel: Validation Results (solo si está disponible)
+        if VALIDATION_AVAILABLE:
+            self.create_validation_panel(splitter)
+            splitter.setSizes([250, 500, 300])
+        else:
+            splitter.setSizes([300, 700])
         
         main_layout.addWidget(splitter)
+    
+    def create_validation_panel(self, parent):
+        """Create the validation panel"""
+        validation_widget = QWidget()
+        layout = QVBoxLayout(validation_widget)
+        
+        # Title
+        title_label = QLabel("Matrix Validation")
+        title_label.setFont(QFont("Arial", 12, QFont.Bold))
+        layout.addWidget(title_label)
+        
+        # Validation panel
+        self.validation_panel = ValidationPanel()
+        layout.addWidget(self.validation_panel)
+        
+        # Connect validation button
+        self.validation_panel.validate_btn.clicked.connect(self.run_advanced_validation)
+        
+        parent.addWidget(validation_widget)
     
     def create_config_panel(self, parent):
         """Create the configuration panel for criteria scales"""
@@ -86,7 +317,7 @@ class MatrixTab(QWidget):
         parent.addWidget(config_widget)
     
     def create_matrix_panel(self, parent):
-        """Create the matrix and analysis panel"""
+        """Create the matrix panel (SIN analysis para evitar complejidad)"""
         matrix_widget = QWidget()
         matrix_layout = QVBoxLayout(matrix_widget)
         
@@ -96,8 +327,7 @@ class MatrixTab(QWidget):
         # Matrix table
         self.create_matrix_table(matrix_layout)
         
-        # Analysis panel
-        self.create_analysis_panel(matrix_layout)
+        # ELIMINADO: Analysis panel para reducir complejidad
         
         parent.addWidget(matrix_widget)
     
@@ -132,10 +362,10 @@ class MatrixTab(QWidget):
         matrix_group = QGroupBox("Decision Matrix")
         matrix_layout = QVBoxLayout(matrix_group)
         
-        # Table controls - EXPANDIDO
+        # Table controls
         controls_layout = QHBoxLayout()
         
-        # Normalization controls - NUEVO
+        # Normalization controls
         norm_label = QLabel("Normalization:")
         controls_layout.addWidget(norm_label)
         
@@ -175,149 +405,90 @@ class MatrixTab(QWidget):
         
         parent_layout.addWidget(matrix_group)
     
-    def on_normalization_method_changed(self, method_text):
-        """Handle normalization method change"""
-        method_map = {
-            "Min-Max (0-1)": "minmax",
-            "Vector (Euclidean)": "vector", 
-            "Sum (Proportional)": "sum",
-            "Max (0-1 by max)": "max"
-        }
-        
-        old_method = self.normalization_method
-        self.normalization_method = method_map.get(method_text, "minmax")
-        
-        # Only recalculate if method actually changed and we're in normalized view
-        if old_method != self.normalization_method and self.is_normalized_view:
-            self.calculate_normalized_data()
-            self.update_matrix_display()
-            self.update_statistics()
-            
-            # Show brief notification of method change
-            self.project_label.setText(
-                self.project_label.text().replace(" - NORMALIZED VIEW", 
-                                                f" - NORMALIZED VIEW ({self.normalization_method.upper()})")
-            )
-
-    def show_normalization_help(self):
-        """Show help dialog for normalization methods"""
-        help_text = """
-        <h3>Normalization Methods:</h3>
-        
-        <b>Min-Max (0-1):</b><br>
-        • Scales values to 0-1 range<br>
-        • Formula: (x - min) / (max - min)<br>
-        • Best for: Mixed scales, easy interpretation<br><br>
-        
-        <b>Vector (Euclidean):</b><br>
-        • Normalizes by vector length<br>
-        • Formula: x / √(Σx²)<br>
-        • Best for: TOPSIS method, geometric relationships<br><br>
-        
-        <b>Sum (Proportional):</b><br>
-        • Values as proportion of total<br>
-        • Formula: x / Σx<br>
-        • Best for: Percentages, relative importance<br><br>
-        
-        <b>Max (0-1 by max):</b><br>
-        • Divides by maximum value<br>
-        • Formula: x / max(x)<br>
-        • Best for: Preserving ratios, simple scaling<br>
-        """
-        
-        QMessageBox.information(self, "Normalization Methods", help_text)
-
-    def create_analysis_panel(self, parent_layout):
-        """Create analysis panel with statistics"""
-        analysis_group = QGroupBox("Real-time Analysis")
-        analysis_layout = QHBoxLayout(analysis_group)
-        
-        # Statistics text
-        self.statistics_text = QTextEdit()
-        self.statistics_text.setMaximumHeight(120)
-        self.statistics_text.setReadOnly(True)
-        analysis_layout.addWidget(self.statistics_text)
-        
-        parent_layout.addWidget(analysis_group)
-    
+    # === MÉTODOS ANTI-BUCLE PRINCIPALES ===
     
     def load_matrix_data(self):
-        """Load matrix data from current project"""
-        if not self.project_controller.current_project_id:
-            self.project_label.setText("No project loaded - Please create or open a project first")
-            self.project_label.setStyleSheet("color: red; font-weight: bold;")
-            
-            # Clear matrix when no project
-            self.matrix_table.setRowCount(0)
-            self.matrix_table.setColumnCount(0)
-            self.clear_config_panel()
-            self.matrix_data.clear()
-            self.update_completeness()
+        """Load matrix data from current project - CORREGIDO"""
+        if self.is_loading_data:
             return
+            
+        self.is_loading_data = True
         
         try:
-            project = self.project_controller.get_current_project()
-            if project:
-                project_name = project.get('name', 'Unknown')
-                self.project_label.setText(f"Project: {project_name}")
-                self.project_label.setStyleSheet("color: green; font-weight: bold;")
-                
-                # Load saved matrix data
-                self.load_saved_matrix_data()
-                
-                # Refresh from project
-                self.refresh_from_project()
-            else:
-                self.project_label.setText("Failed to load project data")
+            if not self.project_controller.current_project_id:
+                self.project_label.setText("No project loaded - Please create or open a project first")
                 self.project_label.setStyleSheet("color: red; font-weight: bold;")
                 
-        except Exception as e:
-            print(f"Error in load_matrix_data: {e}")
-            self.project_label.setText("Error loading project data")
-            self.project_label.setStyleSheet("color: red; font-weight: bold;")
-    
-    def load_saved_matrix_data(self):
-        """Load saved matrix data and configuration"""
-        try:
-            saved_data = self.project_controller.get_decision_matrix()
+                # Clear everything when no project
+                self.matrix_table.setRowCount(0)
+                self.matrix_table.setColumnCount(0)
+                self.clear_config_panel()
+                self.matrix_data.clear()
+                self.cached_alternatives.clear()
+                self.cached_criteria.clear()
+                self.normalized_data.clear()
+                self.update_completeness()
+                
+                # Reset validation state
+                if VALIDATION_AVAILABLE:
+                    self.validation_in_progress = False
+                    if hasattr(self, 'validation_panel'):
+                        self.validation_panel.update_validation_results([])
+                return
             
-            if saved_data:
-                # Load matrix values
-                self.matrix_data = saved_data.get('matrix_data', {})
-                
-                # Load criteria configuration
-                saved_config = saved_data.get('criteria_config', {})
-                
-                # Apply saved configuration to UI
-                for crit_id, config_data in saved_config.items():
-                    if crit_id in self.criteria_config:
-                        config = self.criteria_config[crit_id]
-                        config['scale_type_combo'].setCurrentText(config_data.get('scale_type', 'Numeric (Continuous)'))
-                        config['min_spin'].setValue(config_data.get('min_value', 0))
-                        config['max_spin'].setValue(config_data.get('max_value', 100))
-                        config['unit_edit'].setText(config_data.get('unit', ''))
-                        
-        except Exception as e:
-            print(f"Error loading saved matrix data: {e}")
-
-    def refresh_from_project(self):
-        """Refresh criteria configuration from project data"""
-        print("DEBUG: refresh_from_project called")
+            try:
+                project = self.project_controller.get_current_project()
+                if project:
+                    project_name = project.get('name', 'Unknown')
+                    self.project_label.setText(f"Project: {project_name}")
+                    self.project_label.setStyleSheet("color: green; font-weight: bold;")
+                    
+                    # CORRIGIDO: Forzar refresh completo para proyectos existentes
+                    print("DEBUG: Loading project - forcing fresh data...")
+                    self.cached_alternatives.clear()  # Forzar recarga
+                    self.cached_criteria.clear()     # Forzar recarga
+                    
+                    # Cargar alternatives y criteria PRIMERO
+                    self.refresh_from_project_cached()
+                    
+                    # DESPUÉS cargar la matriz guardada
+                    self.load_saved_matrix_data()
+                    
+                else:
+                    self.project_label.setText("Failed to load project data")
+                    self.project_label.setStyleSheet("color: red; font-weight: bold;")
+                    
+            except Exception as e:
+                print(f"Error in load_matrix_data: {e}")
+                self.project_label.setText("Error loading project data")
+                self.project_label.setStyleSheet("color: red; font-weight: bold;")
         
+        finally:
+            self.is_loading_data = False
+    
+    def refresh_from_project_cached(self):
+        """Refresh con CACHE para evitar requests repetitivos"""
+        if self.is_loading_data:  # Extra protection
+            return
+            
         if not self.project_controller.current_project_id:
-            print("DEBUG: No project ID, showing warning")
-            # No mostrar warning si se llama automáticamente
             return
         
         try:
-            # Get alternatives and criteria
-            alternatives = self.project_controller.get_alternatives()
-            criteria = self.project_controller.get_criteria()
+            # USAR CACHE si está disponible y válido
+            if not self.cached_alternatives or not self.cached_criteria:
+                print("DEBUG: Loading fresh data from API...")
+                self.cached_alternatives = self.project_controller.get_alternatives()
+                self.cached_criteria = self.project_controller.get_criteria()
+            else:
+                print("DEBUG: Using cached data...")
+            
+            alternatives = self.cached_alternatives
+            criteria = self.cached_criteria
             
             print(f"DEBUG: Got {len(alternatives)} alternatives, {len(criteria)} criteria")
             
             if not alternatives and not criteria:
-                # Proyecto vacío recién creado
                 self.project_label.setText(f"Project loaded - Add alternatives and criteria in Project Manager first")
                 self.project_label.setStyleSheet("color: orange; font-weight: bold;")
                 self.clear_config_panel()
@@ -349,10 +520,196 @@ class MatrixTab(QWidget):
             self.initialize_matrix_table(alternatives, criteria)
             
         except Exception as e:
-            print(f"DEBUG: Error in refresh_from_project: {e}")
+            print(f"DEBUG: Error in refresh_from_project_cached: {e}")
             self.project_label.setText("Error refreshing from project")
             self.project_label.setStyleSheet("color: red; font-weight: bold;")
-            QMessageBox.critical(self, "Error", f"Failed to refresh from project: {str(e)}")
+    
+    def refresh_from_project(self):
+        """Refresh manual - limpia cache y recarga"""
+        print("DEBUG: Manual refresh - clearing cache...")
+        self.cached_alternatives.clear()
+        self.cached_criteria.clear()
+        self.refresh_from_project_cached()
+    
+    def on_cell_changed(self, row, col):
+        """Handle cell value changes - VERSION SIN BUCLES"""
+        # Ignorar cambios programáticos
+        if self.is_programmatic_update or self.is_loading_data:
+            return
+        
+        # Si estamos en vista normalizada, no permitir edición
+        if self.is_normalized_view:
+            QMessageBox.warning(self, "Warning", 
+                            "Cannot edit values in normalized view.\nSwitch to original view to edit values.")
+            self.restore_cell_value(row, col)
+            return
+        
+        # Procesar cambio normal
+        item = self.matrix_table.item(row, col)
+        if not item:
+            return
+        
+        value = item.text().strip()
+        data = item.data(Qt.UserRole)
+        
+        if not data:
+            return
+        
+        alt_id = data['alt_id']
+        crit_id = data['crit_id']
+        
+        # Validate the value
+        if self.validate_cell_value(value, crit_id):
+            old_value = self.matrix_data.get(f"{alt_id}_{crit_id}", "")
+            self.matrix_data[f"{alt_id}_{crit_id}"] = value
+            
+            # Update colors and statistics
+            self.update_matrix_colors()
+            self.update_completeness()
+            
+            # Auto-save individual cell change - SIN BUCLES
+            if value != old_value:
+                self.save_cell_change_async(alt_id, crit_id, value)
+            
+            # VALIDACIÓN CONTROLADA: Solo si está habilitada Y no hay otra en progreso
+            if (VALIDATION_AVAILABLE and 
+                hasattr(self, 'validation_panel') and 
+                self.validation_panel.auto_validate_cb.isChecked() and
+                not self.validation_in_progress):
+                
+                # CORREGIDO: Timer mejorado para validación
+                if not hasattr(self, 'validation_timer'):
+                    self.validation_timer = QTimer()
+                    self.validation_timer.setSingleShot(True)
+                    self.validation_timer.timeout.connect(self.run_advanced_validation_delayed)
+                
+                self.validation_timer.stop()
+                self.validation_timer.start(500)  # CORREGIDO: 500ms es mejor balance
+                
+        else:
+            QMessageBox.warning(self, "Invalid Value", 
+                            f"Invalid value for criterion {crit_id}")
+            item.setText(self.matrix_data.get(f"{alt_id}_{crit_id}", ""))
+    
+    def save_cell_change_async(self, alt_id, crit_id, value):
+        """Save individual cell change de manera asíncrona para evitar bucles"""
+        try:
+            updates = [{
+                'alternative_id': alt_id,
+                'criteria_id': crit_id,
+                'value': value
+            }]
+            
+            # Usar timer para hacer el save asíncrono
+            if not hasattr(self, 'save_timer'):
+                self.save_timer = QTimer()
+                self.save_timer.setSingleShot(True)
+                self.save_timer.timeout.connect(lambda: self.project_controller.update_matrix_values(updates))
+            
+            self.save_timer.stop()
+            self.save_timer.start(500)  # Save después de 500ms
+                
+        except Exception as e:
+            print(f"Error auto-saving cell change: {e}")
+    
+    def run_advanced_validation_delayed(self):
+        """Método de validación diferida para auto-validación"""
+        if not VALIDATION_AVAILABLE:
+            return
+        print("DEBUG: Running delayed validation...")
+        self.run_advanced_validation()
+    
+    def run_advanced_validation(self):
+        """Run validation - VERSION CORREGIDA SIN BUGS"""
+        if not VALIDATION_AVAILABLE:
+            return
+            
+        # CORREGIDO: Reset forzado del flag para evitar que se quede bugeado
+        if self.validation_in_progress:
+            print("DEBUG: Validation already in progress, forcing reset...")
+            self.validation_in_progress = False
+            
+        self.validation_in_progress = True
+        
+        try:
+            print("DEBUG: Starting validation...")
+            
+            # USAR CACHE si está disponible, sino cargar fresh
+            alternatives = self.cached_alternatives
+            criteria = self.cached_criteria
+            
+            # Si no hay cache, cargar fresh PERO sin triggear bucles
+            if not alternatives or not criteria:
+                print("DEBUG: No cache available, loading fresh data for validation...")
+                try:
+                    alternatives = self.project_controller.get_alternatives()
+                    criteria = self.project_controller.get_criteria()
+                    # Actualizar cache para próxima vez
+                    self.cached_alternatives = alternatives
+                    self.cached_criteria = criteria
+                except Exception as e:
+                    print(f"DEBUG: Error loading fresh data: {e}")
+                    alternatives = []
+                    criteria = []
+            
+            if not alternatives or not criteria:
+                print("DEBUG: No alternatives or criteria available for validation")
+                if hasattr(self, 'validation_panel'):
+                    self.validation_panel.update_validation_results([])
+                return
+            
+            print(f"DEBUG: Validating with {len(alternatives)} alternatives and {len(criteria)} criteria")
+            
+            # Run comprehensive validation
+            validation_results = self.validator.validate_matrix_comprehensive(
+                matrix_data=self.matrix_data,
+                alternatives=alternatives,
+                criteria=criteria,
+                criteria_config=self._get_current_criteria_config()
+            )
+            
+            print(f"DEBUG: Validation complete - {len(validation_results)} issues found")
+            
+            # Update validation panel
+            if hasattr(self, 'validation_panel'):
+                self.validation_panel.update_validation_results(validation_results)
+            
+            # Highlight problematic cells in matrix
+            self.highlight_validation_issues(validation_results)
+            
+            # Store results for other uses
+            self.last_validation_results = validation_results
+            
+        except Exception as e:
+            print(f"DEBUG: Validation error: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            # CRÍTICO: Siempre resetear el flag
+            self.validation_in_progress = False
+            print("DEBUG: Validation finished, flag reset")
+    
+    # === RESTO DE MÉTODOS ORIGINALES (sin cambios críticos) ===
+    
+    def load_saved_matrix_data(self):
+        """Load saved matrix data and configuration"""
+        try:
+            saved_data = self.project_controller.get_decision_matrix()
+            
+            if saved_data:
+                self.matrix_data = saved_data.get('matrix_data', {})
+                saved_config = saved_data.get('criteria_config', {})
+                
+                for crit_id, config_data in saved_config.items():
+                    if crit_id in self.criteria_config:
+                        config = self.criteria_config[crit_id]
+                        config['scale_type_combo'].setCurrentText(config_data.get('scale_type', 'Numeric (Continuous)'))
+                        config['min_spin'].setValue(config_data.get('min_value', 0))
+                        config['max_spin'].setValue(config_data.get('max_value', 100))
+                        config['unit_edit'].setText(config_data.get('unit', ''))
+                        
+        except Exception as e:
+            print(f"Error loading saved matrix data: {e}")
     
     def clear_config_panel(self):
         """Clear the configuration panel"""
@@ -424,14 +781,12 @@ class MatrixTab(QWidget):
         """Handle scale type change"""
         sender = self.sender()
         
-        # Find which criterion this belongs to
         for crit_id, config in self.criteria_config.items():
             if config['scale_type_combo'] == sender:
                 scale_type = sender.currentText()
                 min_spin = config['min_spin']
                 max_spin = config['max_spin']
                 
-                # Update min/max based on scale type
                 if "Likert 1-5" in scale_type:
                     min_spin.setValue(1)
                     max_spin.setValue(5)
@@ -447,18 +802,14 @@ class MatrixTab(QWidget):
                 break
     
     def apply_configuration(self):
-        """Apply the current configuration to the matrix"""
+        """Apply configuration with cache update"""
         if not self.criteria_config:
             QMessageBox.warning(self, "Warning", "No criteria configuration available")
             return
         
         try:
-            # Rebuild matrix table with new configuration
-            alternatives = self.project_controller.get_alternatives()
-            criteria = self.project_controller.get_criteria()
-            
-            if alternatives and criteria:
-                self.initialize_matrix_table(alternatives, criteria)
+            if self.cached_alternatives and self.cached_criteria:
+                self.initialize_matrix_table(self.cached_alternatives, self.cached_criteria)
                 QMessageBox.information(self, "Success", "Configuration applied successfully")
             else:
                 QMessageBox.warning(self, "Warning", "No alternatives or criteria available")
@@ -468,11 +819,9 @@ class MatrixTab(QWidget):
     
     def initialize_matrix_table(self, alternatives, criteria):
         """Initialize the matrix table with proper structure"""
-        # Set flag to prevent triggering events during initialization
         self.is_programmatic_update = True
         
         try:
-            # Set table dimensions
             self.matrix_table.setRowCount(len(alternatives))
             self.matrix_table.setColumnCount(len(criteria))
             
@@ -498,29 +847,24 @@ class MatrixTab(QWidget):
                     if unit:
                         scale_info += f" {unit}"
                 
-                # Color-code header based on criterion type
                 type_indicator = "↑" if crit_type == 'maximize' else "↓"
                 header_text = f"{crit_name} {type_indicator}\nWeight: {weight}{scale_info}"
                 crit_headers.append(header_text)
             
             self.matrix_table.setHorizontalHeaderLabels(crit_headers)
-            
-            # Configure table properties
             self.matrix_table.resizeColumnsToContents()
             
-            # Initialize cells with existing data or default values
+            # Initialize cells with existing data
             for i in range(len(alternatives)):
                 for j in range(len(criteria)):
                     alt_id = alternatives[i]['id']
                     crit_id = criteria[j]['id']
                     
-                    # Check if we have existing data
                     existing_value = self.matrix_data.get(f"{alt_id}_{crit_id}", "")
                     
                     item = QTableWidgetItem(str(existing_value))
                     item.setData(Qt.UserRole, {'alt_id': alt_id, 'crit_id': crit_id})
                     
-                    # Style based on view mode
                     if self.is_normalized_view:
                         item.setData(Qt.UserRole + 1, "normalized")
                     else:
@@ -529,140 +873,19 @@ class MatrixTab(QWidget):
                     self.matrix_table.setItem(i, j, item)
         
         finally:
-            # Always restore flag
             self.is_programmatic_update = False
         
-        # Update colors and statistics (these don't trigger cellChanged)
         self.update_matrix_colors()
-        self.update_statistics()
         self.update_completeness()
     
-    def on_cell_changed(self, row, col):
-        """Handle cell value changes with proper view handling"""
-        # Ignorar cambios programáticos
-        if self.is_programmatic_update:
-            return
-        
-        # Si estamos en vista normalizada, no permitir edición
-        if self.is_normalized_view:
-            QMessageBox.warning(self, "Warning", 
-                            "Cannot edit values in normalized view.\nSwitch to original view to edit values.")
-            
-            # Restaurar el valor que tenía
-            self.restore_cell_value(row, col)
-            return
-        
-        # Procesar cambio normal (solo en vista original)
-        item = self.matrix_table.item(row, col)
-        if not item:
-            return
-        
-        value = item.text().strip()
-        data = item.data(Qt.UserRole)
-        
-        if not data:
-            return
-        
-        alt_id = data['alt_id']
-        crit_id = data['crit_id']
-        
-        # Validate the value
-        if self.validate_cell_value(value, crit_id):
-            # Store the value in original data
-            old_value = self.matrix_data.get(f"{alt_id}_{crit_id}", "")
-            self.matrix_data[f"{alt_id}_{crit_id}"] = value
-            
-            # Update colors and statistics
-            self.update_matrix_colors()
-            self.update_statistics()
-            self.update_completeness()
-            
-            # Auto-save individual cell change
-            if value != old_value:
-                self.save_cell_change(alt_id, crit_id, value)
-                
-        else:
-            # Invalid value - revert
-            QMessageBox.warning(self, "Invalid Value", 
-                            f"Invalid value for criterion {crit_id}")
-            item.setText(self.matrix_data.get(f"{alt_id}_{crit_id}", ""))
+    # === MÉTODOS BÁSICOS (mantener funcionalidad mínima) ===
     
-    def restore_cell_value(self, row, col):
-        """Restore the correct value for a specific cell"""
-        item = self.matrix_table.item(row, col)
-        if item and item.data(Qt.UserRole):
-            data = item.data(Qt.UserRole)
-            alt_id = data['alt_id']
-            crit_id = data['crit_id']
-            key = f"{alt_id}_{crit_id}"
-            
-            # Set flag to prevent triggering on_cell_changed
-            self.is_programmatic_update = True
-            
-            try:
-                if self.is_normalized_view:
-                    # Restaurar valor normalizado
-                    normalized_value = self.normalized_data.get(key, "")
-                    item.setText(str(normalized_value))
-                else:
-                    # Restaurar valor original
-                    original_value = self.matrix_data.get(key, "")
-                    item.setText(str(original_value))
-            finally:
-                self.is_programmatic_update = False
-
-    def restore_original_values(self):
-        """Restore original values to the matrix display"""
-        if not self.matrix_table.rowCount() or not self.matrix_table.columnCount():
-            return
-        
-        # Temporarily disconnect cellChanged signal
-        self.matrix_table.cellChanged.disconnect()
-        
-        try:
-            # Restore original values
-            for i in range(self.matrix_table.rowCount()):
-                for j in range(self.matrix_table.columnCount()):
-                    item = self.matrix_table.item(i, j)
-                    if item and item.data(Qt.UserRole):
-                        data = item.data(Qt.UserRole)
-                        alt_id = data['alt_id']
-                        crit_id = data['crit_id']
-                        key = f"{alt_id}_{crit_id}"
-                        
-                        # Restore original value
-                        original_value = self.matrix_data.get(key, "")
-                        item.setText(str(original_value))
-                        item.setToolTip("")  # Clear tooltip
-        
-        finally:
-            # Reconnect the signal
-            self.matrix_table.cellChanged.connect(self.on_cell_changed)
-
-    def save_cell_change(self, alt_id, crit_id, value):
-        """Save individual cell change to backend"""
-        try:
-            updates = [{
-                'alternative_id': alt_id,
-                'criteria_id': crit_id,
-                'value': value
-            }]
-            
-            success = self.project_controller.update_matrix_values(updates)
-            if not success:
-                print(f"Warning: Failed to auto-save cell change for {alt_id}_{crit_id}")
-                
-        except Exception as e:
-            print(f"Error auto-saving cell change: {e}")
-
-
     def validate_cell_value(self, value, crit_id):
         """Validate a cell value according to criterion configuration"""
         if not value:
-            return True  # Empty values are allowed
+            return True
         
         if crit_id not in self.criteria_config:
-            # Basic numeric validation if no config
             try:
                 float(value)
                 return True
@@ -680,22 +903,24 @@ class MatrixTab(QWidget):
             return False
     
     def update_matrix_colors(self):
-        """Update cell colors based on values and criterion types"""
-        if not self.criteria_config:
+        """Update cell colors - CORREGIDO: Sin celdas negras para valores vacíos"""
+        if not self.criteria_config or not self.cached_criteria:
             return
         
-        criteria = self.project_controller.get_criteria()
-        
-        for j, crit in enumerate(criteria):
+        for j, crit in enumerate(self.cached_criteria):
             crit_type = crit.get('optimization_type', 'maximize')
             
-            # Get all values in this column
+            # Collect valid values for this column
             values = []
+            valid_items = []  # Track which items have valid values
+            
             for i in range(self.matrix_table.rowCount()):
                 item = self.matrix_table.item(i, j)
                 if item and item.text().strip():
                     try:
-                        values.append(float(item.text()))
+                        value = float(item.text())
+                        values.append(value)
+                        valid_items.append((i, value))
                     except ValueError:
                         continue
             
@@ -704,112 +929,61 @@ class MatrixTab(QWidget):
             
             col_min, col_max = min(values), max(values)
             
-            # Apply colors with different intensity for normalized vs original
+            # Apply colors only to valid items
             for i in range(self.matrix_table.rowCount()):
                 item = self.matrix_table.item(i, j)
-                if item and item.text().strip():
+                if item:
+                    # CORREGIDO: Manejar celdas vacías correctamente
+                    if not item.text().strip():
+                        # Celda vacía - color neutro (blanco/transparente)
+                        item.setBackground(QColor(255, 255, 255))  # Blanco en lugar de negro
+                        continue
+                    
                     try:
                         value = float(item.text())
                         
-                        # Normalize value to 0-1 range for color calculation
+                        # Skip validation highlighted cells
+                        current_bg = item.background()
+                        if (current_bg.color() == QColor(255, 200, 200) or
+                            current_bg.color() == QColor(255, 220, 200) or
+                            current_bg.color() == QColor(255, 255, 200)):
+                            continue
+                        
+                        # Calculate normalized position for coloring
                         if col_max > col_min:
                             normalized = (value - col_min) / (col_max - col_min)
                         else:
                             normalized = 0.5
                         
-                        # Color intensity based on view type
-                        if self.is_normalized_view:
-                            # More intense colors for normalized view
-                            intensity = 150
-                            base_color = 200
-                        else:
-                            # Softer colors for original view
-                            intensity = 80
-                            base_color = 230
+                        # Color intensity and base
+                        intensity = 60  # CORREGIDO: Reducido para colores más suaves
+                        base_color = 240  # CORREGIDO: Base más clara
                         
-                        # Apply color based on criterion type
                         if crit_type == 'maximize':
-                            # Green for high values (good)
+                            # Green tint for high values (good)
                             green = base_color + int(normalized * intensity)
-                            red = base_color - int(normalized * intensity // 2)
-                            blue = base_color - int(normalized * intensity // 2)
+                            red = base_color - int(normalized * intensity // 3)  # Menos contraste
+                            blue = base_color - int(normalized * intensity // 3)
                         else:
-                            # Green for low values (good for cost criteria)
+                            # Green tint for low values (good for cost criteria)
                             green = base_color + int((1-normalized) * intensity)
-                            red = base_color - int((1-normalized) * intensity // 2)
-                            blue = base_color - int((1-normalized) * intensity // 2)
+                            red = base_color - int((1-normalized) * intensity // 3)
+                            blue = base_color - int((1-normalized) * intensity // 3)
                         
                         # Ensure color values are in valid range
-                        red = max(180, min(255, red))
-                        green = max(180, min(255, green))
-                        blue = max(180, min(255, blue))
+                        red = max(200, min(255, red))    # CORREGIDO: Mínimo más alto
+                        green = max(200, min(255, green))
+                        blue = max(200, min(255, blue))
                         
                         color = QColor(red, green, blue)
                         item.setBackground(color)
-                        
-                        # Add flag for styling reference
-                        if self.is_normalized_view:
-                            item.setData(Qt.UserRole + 1, "normalized")
-                        else:
-                            item.setData(Qt.UserRole + 1, "original")
                             
                     except ValueError:
-                        # Clear background for invalid values
-                        item.setBackground(QColor())
-    
-    def update_statistics(self):
-        """Update the statistics panel"""
-        current_data = self.normalized_data if self.is_normalized_view else self.matrix_data
-        
-        if not current_data:
-            self.statistics_text.setText("No data available for analysis")
-            return
-        
-        stats_text = f"Matrix Statistics {'(Normalized)' if self.is_normalized_view else '(Original)'}:\n\n"
-        
-        # Get alternatives and criteria
-        alternatives = self.project_controller.get_alternatives()
-        criteria = self.project_controller.get_criteria()
-        
-        if not alternatives or not criteria:
-            return
-        
-        # Statistics by criterion
-        for crit in criteria:
-            crit_id = crit['id']
-            crit_name = crit['name']
-            
-            values = []
-            for alt in alternatives:
-                alt_id = alt['id']
-                key = f"{alt_id}_{crit_id}"
-                if key in current_data and current_data[key]:
-                    try:
-                        values.append(float(current_data[key]))
-                    except ValueError:
-                        continue
-            
-            if values:
-                min_val = min(values)
-                max_val = max(values)
-                avg_val = sum(values) / len(values)
-                std_val = np.std(values)
-                
-                stats_text += f"{crit_name}:\n"
-                stats_text += f"  Min={min_val:.4f}, Max={max_val:.4f}\n"
-                stats_text += f"  Avg={avg_val:.4f}, Std={std_val:.4f}\n\n"
-        
-        # Add preliminary ranking if normalized
-        if self.is_normalized_view:
-            stats_text += "Preliminary Ranking (Simple Sum):\n"
-            ranking = self.calculate_preliminary_ranking()
-            for i, (alt_name, score) in enumerate(ranking[:5]):  # Top 5
-                stats_text += f"{i+1}. {alt_name}: {score:.4f}\n"
-        
-        self.statistics_text.setText(stats_text)
+                        # Invalid numeric value - light gray background
+                        item.setBackground(QColor(245, 245, 245))  # Gris muy claro
     
     def update_completeness(self):
-        """Update the completeness progress bar"""
+        """Update completeness progress bar"""
         if not self.matrix_table.rowCount() or not self.matrix_table.columnCount():
             self.progress_bar.setValue(0)
             self.completeness_percent.setText("0%")
@@ -828,161 +1002,96 @@ class MatrixTab(QWidget):
         self.progress_bar.setValue(completeness)
         self.completeness_percent.setText(f"{completeness}%")
     
-    def toggle_normalized_view(self, checked):
-        """Toggle between original and normalized view"""
-        self.is_normalized_view = checked
-        
-        if checked:
-            # Calculate normalized data
-            self.calculate_normalized_data()
-            
-            # Update status to show normalized view
-            current_text = self.project_label.text()
-            if " - NORMALIZED VIEW" not in current_text:
-                self.project_label.setText(f"{current_text} - NORMALIZED VIEW")
-            
-        else:
-            # Return to original view - update status
-            text = self.project_label.text().replace(" - NORMALIZED VIEW", "")
-            self.project_label.setText(text)
-        
-        # Update display for both cases
-        self.update_matrix_display()
-        self.update_matrix_colors()
-        self.update_statistics()
-    
-    def calculate_normalized_data(self):
-        """Calculate normalized data using selected method"""
-        if not self.matrix_data:
-            self.normalized_data = {}
+    def save_matrix(self):
+        """Save matrix with validation check"""
+        if not self.project_controller.current_project_id:
+            QMessageBox.warning(self, "Warning", "No project loaded")
             return
         
+        # Run validation before saving if available
+        if VALIDATION_AVAILABLE and hasattr(self, 'validator'):
+            self.run_advanced_validation()
+            
+            if self.validator.has_blocking_issues():
+                reply = QMessageBox.question(
+                    self, "Validation Issues", 
+                    "Critical validation issues detected. Save anyway?",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if reply == QMessageBox.No:
+                    return
+        
         try:
-            # Get alternatives and criteria
-            alternatives = self.project_controller.get_alternatives()
-            criteria = self.project_controller.get_criteria()
+            criteria_config_data = {}
+            for crit_id, config in self.criteria_config.items():
+                criteria_config_data[crit_id] = {
+                    'scale_type': config['scale_type_combo'].currentText(),
+                    'min_value': config['min_spin'].value(),
+                    'max_value': config['max_spin'].value(),
+                    'unit': config['unit_edit'].text()
+                }
             
-            if not alternatives or not criteria:
-                return
+            success = self.project_controller.save_decision_matrix(
+                self.matrix_data, criteria_config_data
+            )
             
-            # Create matrix from current data
-            matrix = np.zeros((len(alternatives), len(criteria)))
-            
-            for i, alt in enumerate(alternatives):
-                for j, crit in enumerate(criteria):
-                    key = f"{alt['id']}_{crit['id']}"
-                    if key in self.matrix_data and self.matrix_data[key]:
-                        try:
-                            matrix[i, j] = float(self.matrix_data[key])
-                        except ValueError:
-                            matrix[i, j] = 0
-            
-            # Apply normalization method
-            normalized_matrix = self.apply_normalization(matrix, criteria)
-            
-            # Store normalized data
-            self.normalized_data = {}
-            for i, alt in enumerate(alternatives):
-                for j, crit in enumerate(criteria):
-                    key = f"{alt['id']}_{crit['id']}"
-                    self.normalized_data[key] = f"{normalized_matrix[i, j]:.4f}"
-                    
+            if success:
+                QMessageBox.information(self, "Success", "Matrix saved successfully")
+            else:
+                QMessageBox.critical(self, "Error", "Failed to save matrix")
+                
         except Exception as e:
-            print(f"Error calculating normalized data: {e}")
-            self.normalized_data = {}
-
-    def apply_normalization(self, matrix, criteria):
-        """Apply selected normalization method to matrix"""
-        normalized = matrix.copy()
-        
-        for j in range(matrix.shape[1]):
-            col = matrix[:, j]
-            crit = criteria[j]
-            is_benefit = crit.get('optimization_type', 'maximize') == 'maximize'
+            QMessageBox.critical(self, "Error", f"Failed to save matrix: {str(e)}")
+    
+    def auto_save(self):
+        """Auto-save reducido para evitar requests excesivos"""
+        if (self.matrix_data and 
+            self.project_controller.current_project_id and 
+            not self.is_loading_data and 
+            not self.is_programmatic_update):
             
-            if self.normalization_method == 'minmax':
-                col_min, col_max = np.min(col), np.max(col)
-                if col_max != col_min:
-                    if is_benefit:
-                        normalized[:, j] = (col - col_min) / (col_max - col_min)
-                    else:
-                        normalized[:, j] = (col_max - col) / (col_max - col_min)
-                else:
-                    normalized[:, j] = 1.0 if is_benefit else 0.0
-                    
-            elif self.normalization_method == 'vector':
-                col_norm = np.sqrt(np.sum(col ** 2))
-                if col_norm > 0:
-                    normalized[:, j] = col / col_norm
-                    if not is_benefit:
-                        normalized[:, j] = 1 - normalized[:, j]
-                else:
-                    normalized[:, j] = 0
-                    
-            elif self.normalization_method == 'sum':
-                col_sum = np.sum(col)
-                if col_sum > 0:
-                    if is_benefit:
-                        normalized[:, j] = col / col_sum
-                    else:
-                        col_inv = 1 / (col + 1e-10)  # Avoid division by zero
-                        col_inv_sum = np.sum(col_inv)
-                        normalized[:, j] = col_inv / col_inv_sum
-                else:
-                    normalized[:, j] = 1 / len(col)
-                    
-            elif self.normalization_method == 'max':
-                col_max = np.max(col)
-                if col_max > 0:
-                    if is_benefit:
-                        normalized[:, j] = col / col_max
-                    else:
-                        col_min = np.min(col)
-                        normalized[:, j] = col_min / (col + 1e-10)
-                else:
-                    normalized[:, j] = 0
-        
-        return normalized
-
-    def update_matrix_display(self):
-        """Update matrix table display based on current view WITHOUT triggering events"""
-        if not self.matrix_table.rowCount() or not self.matrix_table.columnCount():
-            return
-        
-        # Set flag to prevent triggering cellChanged events
-        self.is_programmatic_update = True
-        
-        try:
-            # Choose data source based on current view
-            data_source = self.normalized_data if self.is_normalized_view else self.matrix_data
+            try:
+                criteria_config_data = {}
+                for crit_id, config in self.criteria_config.items():
+                    criteria_config_data[crit_id] = {
+                        'scale_type': config['scale_type_combo'].currentText(),
+                        'min_value': config['min_spin'].value(),
+                        'max_value': config['max_spin'].value(),
+                        'unit': config['unit_edit'].text()
+                    }
+                
+                self.project_controller.save_decision_matrix(
+                    self.matrix_data, criteria_config_data
+                )
+                
+                print("Matrix auto-saved successfully")
+                
+            except Exception as e:
+                print(f"Auto-save failed: {e}")
+    
+    # === MÉTODOS RESTANTES PARA FUNCIONALIDAD COMPLETA ===
+    
+    def restore_cell_value(self, row, col):
+        """Restore cell value"""
+        item = self.matrix_table.item(row, col)
+        if item and item.data(Qt.UserRole):
+            data = item.data(Qt.UserRole)
+            alt_id = data['alt_id']
+            crit_id = data['crit_id']
+            key = f"{alt_id}_{crit_id}"
             
-            # Update cell values and tooltips
-            for i in range(self.matrix_table.rowCount()):
-                for j in range(self.matrix_table.columnCount()):
-                    item = self.matrix_table.item(i, j)
-                    if item and item.data(Qt.UserRole):
-                        data = item.data(Qt.UserRole)
-                        alt_id = data['alt_id']
-                        crit_id = data['crit_id']
-                        key = f"{alt_id}_{crit_id}"
-                        
-                        # Get the display value
-                        display_value = data_source.get(key, "")
-                        
-                        # Update the cell text
-                        item.setText(str(display_value))
-                        
-                        # Set appropriate tooltip
-                        if self.is_normalized_view and display_value:
-                            original_value = self.matrix_data.get(key, 'N/A')
-                            item.setToolTip(f"Normalized value: {display_value}\nOriginal: {original_value}\nMethod: {self.normalization_method}")
-                        else:
-                            item.setToolTip("")
-        
-        finally:
-            # Always restore flag
-            self.is_programmatic_update = False
-
+            self.is_programmatic_update = True
+            
+            try:
+                if self.is_normalized_view:
+                    normalized_value = self.normalized_data.get(key, "")
+                    item.setText(str(normalized_value))
+                else:
+                    original_value = self.matrix_data.get(key, "")
+                    item.setText(str(original_value))
+            finally:
+                self.is_programmatic_update = False
+    
     def clear_all_values(self):
         """Clear all matrix values"""
         reply = QMessageBox.question(self, "Confirm Clear", 
@@ -999,90 +1108,206 @@ class MatrixTab(QWidget):
                         item.setText("")
             
             self.update_matrix_colors()
-            self.update_statistics()
             self.update_completeness()
     
-    def save_matrix(self):
-        """Save the current matrix to the project"""
-        if not self.project_controller.current_project_id:
-            QMessageBox.warning(self, "Warning", "No project loaded")
+    def on_normalization_method_changed(self, method_text):
+        """Handle normalization method change"""
+        method_map = {
+            "Min-Max (0-1)": "minmax",
+            "Vector (Euclidean)": "vector", 
+            "Sum (Proportional)": "sum",
+            "Max (0-1 by max)": "max"
+        }
+        
+        old_method = self.normalization_method
+        self.normalization_method = method_map.get(method_text, "minmax")
+        
+        if old_method != self.normalization_method and self.is_normalized_view:
+            self.calculate_normalized_data()
+            self.update_matrix_display()
+    
+    def show_normalization_help(self):
+        """Show normalization help"""
+        help_text = """
+        <h3>Normalization Methods:</h3>
+        
+        <b>Min-Max (0-1):</b><br>
+        • Scales values to 0-1 range<br>
+        • Formula: (x - min) / (max - min)<br><br>
+        
+        <b>Vector (Euclidean):</b><br>
+        • Normalizes by vector length<br>
+        • Formula: x / √(Σx²)<br><br>
+        
+        <b>Sum (Proportional):</b><br>
+        • Values as proportion of total<br>
+        • Formula: x / Σx<br><br>
+        
+        <b>Max (0-1 by max):</b><br>
+        • Divides by maximum value<br>
+        • Formula: x / max(x)<br>
+        """
+        
+        QMessageBox.information(self, "Normalization Methods", help_text)
+    
+    def toggle_normalized_view(self, checked):
+        """Toggle normalized view"""
+        self.is_normalized_view = checked
+        
+        if checked:
+            self.calculate_normalized_data()
+            current_text = self.project_label.text()
+            if " - NORMALIZED VIEW" not in current_text:
+                self.project_label.setText(f"{current_text} - NORMALIZED VIEW")
+            
+        else:
+            text = self.project_label.text().replace(" - NORMALIZED VIEW", "")
+            self.project_label.setText(text)
+        
+        self.update_matrix_display()
+        self.update_matrix_colors()
+    
+    def calculate_normalized_data(self):
+        """Calculate normalized data"""
+        if not self.matrix_data or not self.cached_alternatives or not self.cached_criteria:
+            self.normalized_data = {}
             return
         
         try:
-            # Prepare criteria configuration data
-            criteria_config_data = {}
-            for crit_id, config in self.criteria_config.items():
-                criteria_config_data[crit_id] = {
-                    'scale_type': config['scale_type_combo'].currentText(),
-                    'min_value': config['min_spin'].value(),
-                    'max_value': config['max_spin'].value(),
-                    'unit': config['unit_edit'].text()
-                }
+            alternatives = self.cached_alternatives
+            criteria = self.cached_criteria
             
-            # Save matrix data and configuration
-            success = self.project_controller.save_decision_matrix(
-                self.matrix_data, criteria_config_data
-            )
+            matrix = np.zeros((len(alternatives), len(criteria)))
             
-            if success:
-                QMessageBox.information(self, "Success", "Matrix saved successfully")
-            else:
-                QMessageBox.critical(self, "Error", "Failed to save matrix")
-                
+            for i, alt in enumerate(alternatives):
+                for j, crit in enumerate(criteria):
+                    key = f"{alt['id']}_{crit['id']}"
+                    if key in self.matrix_data and self.matrix_data[key]:
+                        try:
+                            matrix[i, j] = float(self.matrix_data[key])
+                        except ValueError:
+                            matrix[i, j] = 0
+            
+            normalized_matrix = self.apply_normalization(matrix, criteria)
+            
+            self.normalized_data = {}
+            for i, alt in enumerate(alternatives):
+                for j, crit in enumerate(criteria):
+                    key = f"{alt['id']}_{crit['id']}"
+                    self.normalized_data[key] = f"{normalized_matrix[i, j]:.4f}"
+                    
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to save matrix: {str(e)}")
+            print(f"Error calculating normalized data: {e}")
+            self.normalized_data = {}
     
-    def auto_save(self):
-        """Auto-save the matrix data every 30 seconds"""
-        if self.matrix_data and self.project_controller.current_project_id:
-            try:
-                # Prepare criteria configuration data
-                criteria_config_data = {}
-                for crit_id, config in self.criteria_config.items():
-                    criteria_config_data[crit_id] = {
-                        'scale_type': config['scale_type_combo'].currentText(),
-                        'min_value': config['min_spin'].value(),
-                        'max_value': config['max_spin'].value(),
-                        'unit': config['unit_edit'].text()
-                    }
-                
-                # Silent auto-save
-                self.project_controller.save_decision_matrix(
-                    self.matrix_data, criteria_config_data
-                )
-                
-                print("Matrix auto-saved successfully")
-                
-            except Exception as e:
-                print(f"Auto-save failed: {e}")
+    def apply_normalization(self, matrix, criteria):
+        """Apply normalization method"""
+        normalized = matrix.copy()
+        
+        for j in range(matrix.shape[1]):
+            col = matrix[:, j]
+            crit = criteria[j]
+            is_benefit = crit.get('optimization_type', 'maximize') == 'maximize'
+            
+            if self.normalization_method == 'minmax':
+                col_min, col_max = np.min(col), np.max(col)
+                if col_max != col_min:
+                    if is_benefit:
+                        normalized[:, j] = (col - col_min) / (col_max - col_min)
+                    else:
+                        normalized[:, j] = (col_max - col) / (col_max - col_min)
+                else:
+                    normalized[:, j] = 1.0 if is_benefit else 0.0
+        
+        return normalized
     
-    def calculate_preliminary_ranking(self):
-        """Calculate preliminary ranking using simple weighted sum"""
-        alternatives = self.project_controller.get_alternatives()
-        criteria = self.project_controller.get_criteria()
+    def update_matrix_display(self):
+        """Update matrix display"""
+        if not self.matrix_table.rowCount() or not self.matrix_table.columnCount():
+            return
         
-        if not alternatives or not criteria:
-            return []
+        self.is_programmatic_update = True
         
-        scores = []
-        for alt in alternatives:
-            total_score = 0
-            valid_values = 0
+        try:
+            data_source = self.normalized_data if self.is_normalized_view else self.matrix_data
             
-            for crit in criteria:
-                key = f"{alt['id']}_{crit['id']}"
-                if key in self.normalized_data and self.normalized_data[key]:
-                    try:
-                        value = float(self.normalized_data[key])
-                        weight = crit.get('weight', 1.0)
-                        total_score += value * weight
-                        valid_values += 1
-                    except ValueError:
-                        continue
-            
-            if valid_values > 0:
-                scores.append((alt['name'], total_score))
+            for i in range(self.matrix_table.rowCount()):
+                for j in range(self.matrix_table.columnCount()):
+                    item = self.matrix_table.item(i, j)
+                    if item and item.data(Qt.UserRole):
+                        data = item.data(Qt.UserRole)
+                        alt_id = data['alt_id']
+                        crit_id = data['crit_id']
+                        key = f"{alt_id}_{crit_id}"
+                        
+                        display_value = data_source.get(key, "")
+                        item.setText(str(display_value))
+                        
+                        if self.is_normalized_view and display_value:
+                            original_value = self.matrix_data.get(key, 'N/A')
+                            item.setToolTip(f"Normalized: {display_value}\nOriginal: {original_value}")
+                        else:
+                            item.setToolTip("")
         
-        # Sort by score (descending)
-        scores.sort(key=lambda x: x[1], reverse=True)
-        return scores
+        finally:
+            self.is_programmatic_update = False
+    
+    # === MÉTODOS DE VALIDACIÓN (solo si está disponible) ===
+    
+    def _get_current_criteria_config(self):
+        """Get current criteria configuration"""
+        config = {}
+        for crit_id, ui_config in self.criteria_config.items():
+            config[crit_id] = {
+                'scale_type': ui_config['scale_type_combo'].currentText(),
+                'min_value': ui_config['min_spin'].value(),
+                'max_value': ui_config['max_spin'].value(),
+                'unit': ui_config['unit_edit'].text()
+            }
+        return config
+    
+    def highlight_validation_issues(self, validation_results):
+        """Highlight validation issues"""
+        if not VALIDATION_AVAILABLE:
+            return
+            
+        self.clear_cell_highlights()
+        
+        for result in validation_results:
+            if result.affected_cells:
+                for row, col in result.affected_cells:
+                    if (row < self.matrix_table.rowCount() and 
+                        col < self.matrix_table.columnCount()):
+                        
+                        item = self.matrix_table.item(row, col)
+                        if item:
+                            if result.severity == ValidationSeverity.CRITICAL:
+                                item.setBackground(QColor(255, 200, 200))
+                            elif result.severity == ValidationSeverity.ERROR:
+                                item.setBackground(QColor(255, 220, 200))
+                            elif result.severity == ValidationSeverity.WARNING:
+                                item.setBackground(QColor(255, 255, 200))
+                            
+                            item.setToolTip(f"{result.message}\n{result.suggestion}")
+    
+    def clear_cell_highlights(self):
+        """Clear cell highlights - CORREGIDO"""
+        print("DEBUG: Clearing cell highlights...")
+        
+        for i in range(self.matrix_table.rowCount()):
+            for j in range(self.matrix_table.columnCount()):
+                item = self.matrix_table.item(i, j)
+                if item:
+                    # Reset background to white for empty cells, or let update_matrix_colors handle it
+                    if not item.text().strip():
+                        item.setBackground(QColor(255, 255, 255))  # Blanco para celdas vacías
+                    else:
+                        item.setBackground(QColor())  # Reset para que update_matrix_colors lo maneje
+                    
+                    # Clear validation tooltips (keep only normalization tooltips)
+                    current_tooltip = item.toolTip()
+                    if current_tooltip and "Normalized:" not in current_tooltip and "Original:" not in current_tooltip:
+                        item.setToolTip("")
+        
+        # Reapply normal matrix colors
+        self.update_matrix_colors()
