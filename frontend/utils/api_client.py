@@ -151,3 +151,90 @@ class ApiClient:
         except Exception as e:
             print(f"Error updating matrix values: {e}")
             return False
+        
+    def get_available_methods(self):
+        """Get all available MCDM methods"""
+        try:
+            response = self.session.get(f"{self.base_url}/methods")
+            return response.json() if response.status_code == 200 else []
+        except Exception as e:
+            print(f"Error getting methods: {e}")
+            return []
+
+    def execute_method(self, project_id, method_name, parameters=None):
+        """Execute a specific MCDM method"""
+        try:
+            data = {'parameters': parameters} if parameters else {}
+            response = self.session.post(
+                f"{self.base_url}/projects/{project_id}/methods/{method_name}/execute",
+                json=data
+            )
+            return response.json() if response.status_code == 200 else None
+        except Exception as e:
+            print(f"Error executing method {method_name}: {e}")
+            return None
+
+    def execute_all_methods(self, project_id, parameters=None):
+        """Execute all MCDM methods"""
+        try:
+            data = {'parameters': parameters} if parameters else {}
+            response = self.session.post(
+                f"{self.base_url}/projects/{project_id}/methods/execute-all",
+                json=data
+            )
+            return response.json() if response.status_code == 200 else {}
+        except Exception as e:
+            print(f"Error executing all methods: {e}")
+            return {}
+
+    def compare_methods(self, project_id, method_names=None):
+        """Compare results from multiple methods"""
+        try:
+            params = {}
+            if method_names:
+                params['methods'] = ','.join(method_names)
+            
+            response = self.session.get(
+                f"{self.base_url}/projects/{project_id}/methods/compare",
+                params=params
+            )
+            return response.json() if response.status_code == 200 else {}
+        except Exception as e:
+            print(f"Error comparing methods: {e}")
+            return {}
+
+    def get_method_results(self, project_id, method_name=None):
+        """Get results for a specific method or all methods"""
+        try:
+            if method_name:
+                response = self.session.get(
+                    f"{self.base_url}/projects/{project_id}/results/{method_name}"
+                )
+            else:
+                response = self.session.get(
+                    f"{self.base_url}/projects/{project_id}/results"
+                )
+            return response.json() if response.status_code == 200 else {}
+        except Exception as e:
+            print(f"Error getting results: {e}")
+            return {}
+
+    def perform_sensitivity_analysis(self, project_id, method_name, criteria_id, 
+                                min_weight=0.1, max_weight=1.0, steps=10):
+        """Perform sensitivity analysis"""
+        try:
+            data = {
+                'method_name': method_name,
+                'criteria_id': criteria_id,
+                'min_weight': min_weight,
+                'max_weight': max_weight,
+                'steps': steps
+            }
+            response = self.session.post(
+                f"{self.base_url}/projects/{project_id}/sensitivity",
+                json=data
+            )
+            return response.json() if response.status_code == 200 else {}
+        except Exception as e:
+            print(f"Error performing sensitivity analysis: {e}")
+            return {}

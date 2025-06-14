@@ -4,12 +4,18 @@
   "description": "asfasf",
   "decision_maker": "aSAf",
   "created_at": "2025-05-21T19:19:52.608252",
-  "updated_at": "2025-05-21T22:15:16.720985",
+  "updated_at": "2025-06-14T13:42:19.070492",
   "alternatives": [
     {
       "id": "A1",
       "name": "biozjbvc",
       "description": "zxv",
+      "metadata": {}
+    },
+    {
+      "id": "A2",
+      "name": "zcxb",
+      "description": "sfgjsjt",
       "metadata": {}
     }
   ],
@@ -23,8 +29,144 @@
       "weight": 1.0,
       "unit": "",
       "metadata": {}
+    },
+    {
+      "id": "C2",
+      "name": "vnxbn",
+      "description": "",
+      "optimization_type": "maximize",
+      "scale_type": "quantitative",
+      "weight": 1.0,
+      "unit": "",
+      "metadata": {}
     }
   ],
-  "metadata": {},
-  "results": {}
+  "metadata": {
+    "criteria_config": {
+      "C1": {
+        "scale_type": "Numeric (Continuous)",
+        "min_value": 0.0,
+        "max_value": 100.0,
+        "unit": ""
+      }
+    }
+  },
+  "results": {
+    "TOPSIS": {
+      "method_name": "TOPSIS",
+      "alternative_ids": [
+        "A1",
+        "A2"
+      ],
+      "alternative_names": [
+        "biozjbvc",
+        "zcxb"
+      ],
+      "scores": [
+        0.5,
+        0.5
+      ],
+      "rankings": [
+        1,
+        1
+      ],
+      "execution_time": 0.0,
+      "parameters": {
+        "normalization_method": "vector",
+        "normalize_matrix": true,
+        "distance_metric": "euclidean",
+        "apply_weights_after_normalization": true,
+        "consider_criteria_type": true
+      },
+      "created_at": "2025-06-14T13:42:19.070284",
+      "metadata": {
+        "normalized_values": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "weighted_values": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "ideal_positive": [
+          0.0,
+          0.0
+        ],
+        "ideal_negative": [
+          0.0,
+          0.0
+        ],
+        "distances_positive": [
+          0.0,
+          0.0
+        ],
+        "distances_negative": [
+          0.0,
+          0.0
+        ],
+        "execution_time": 0.0005676746368408203
+      }
+    }
+  },
+  "decision_matrix": {
+    "name": "Matriz de SAdasd",
+    "alternatives": [
+      {
+        "id": "A1",
+        "name": "biozjbvc",
+        "description": "zxv",
+        "metadata": {}
+      },
+      {
+        "id": "A2",
+        "name": "zcxb",
+        "description": "sfgjsjt",
+        "metadata": {}
+      }
+    ],
+    "criteria": [
+      {
+        "id": "C1",
+        "name": "xcbzb",
+        "description": "",
+        "optimization_type": "maximize",
+        "scale_type": "quantitative",
+        "weight": 1.0,
+        "unit": "",
+        "metadata": {}
+      },
+      {
+        "id": "C2",
+        "name": "vnxbn",
+        "description": "",
+        "optimization_type": "maximize",
+        "scale_type": "quantitative",
+        "weight": 1.0,
+        "unit": "",
+        "metadata": {}
+      }
+    ],
+    "values": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  }
 }

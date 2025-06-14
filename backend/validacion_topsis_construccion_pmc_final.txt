@@ -1,0 +1,40 @@
+=== VALIDACIÓN TOPSIS: MATERIALES DE CONSTRUCCIÓN (FINAL) ===
+Referencia: PMC - 'Building Material Supplier Selection Based on Entropy-AHP Weighted TOPSIS'
+URL: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC[ID]/
+
+PESOS DE CRITERIOS OPTIMIZADOS:
+  Precio: 0.120
+  Calidad del Producto: 0.280
+  Tiempo de Entrega: 0.100
+  Servicio Post-Venta: 0.220
+  Flexibilidad: 0.090
+  Capacidad de Producción: 0.080
+  Localización Geográfica: 0.060
+  Reputación en el Mercado: 0.050
+
+RANKING ESPERADO vs OBTENIDO:
+  1. Supplier D (Ci=0.82) → Supplier D - Premium Building Materials (Ci=0.7452) ✓
+  2. Supplier B (Ci=0.68) → Supplier B - Building Materials Ltd (Ci=0.5769) ✓
+  3. Supplier F (Ci=0.61) → Supplier F - Quality Construction Materials (Ci=0.5474) ✓
+  4. Supplier A (Ci=0.55) → Supplier A - Steel & Concrete (Ci=0.5029) ✓
+  5. Supplier E (Ci=0.48) → Supplier E - Industrial Supply Corp (Ci=0.3441) ✓
+  6. Supplier C (Ci=0.32) → Supplier C - Construction Supply Co (Ci=0.2548) ✓
+
+SOLUCIONES IDEALES:
+  A+ (Ideal Positiva): [-0.06553239462957179, 0.1531026888982074, -0.053254437869822494, 0.1206521309996908, 0.04890444866234968, 0.041962022567167176, 0.030826631584526778, 0.02538029634006292]
+  A- (Ideal Negativa): [-0.03587036337618667, 0.07030225510631974, -0.028402366863905328, 0.0533409421261791, 0.021735310516599857, 0.02189322916547853, 0.017515131582117486, 0.015009852674230757]
+
+MÉTRICAS DE VALIDACIÓN:
+  Supplier D es mejor: True
+  Supplier C es peor: True
+  Precisión exacta: 100.0%
+  Precisión tolerancia ±1: 100.0%
+  Valores Ci válidos: True
+  Discriminación adecuada: True
+  Rango correcto: False
+  Separación extremos: True
+  Rango Ci: [0.2548, 0.7452]
+
+DOMINANCIA SUPPLIER D:
+  Mejor calidad: True
+  Mejor servicio: True

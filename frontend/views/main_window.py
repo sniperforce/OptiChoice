@@ -219,8 +219,10 @@ class MCDMApplication(QMainWindow):
     def init_tabs(self):
         from views.tabs.problem_tab import ProblemTab
         from views.tabs.matrix_tab import MatrixTab 
+        from views.tabs.method_tab import MethodTab
 
         self.project_controller = ProjectController()
+
         # Problem Definition tab
         self.problem_tab = ProblemTab(self.project_controller)
         self.tab_widget.addTab(self.problem_tab, "Problem Definition")
@@ -230,9 +232,14 @@ class MCDMApplication(QMainWindow):
         self.tab_widget.addTab(self.matrix_tab, "Decision Matrix")
         
         # Method Selection tab
-        self.method_tab = QWidget()
+        self.method_tab = MethodTab(self.project_controller)
         self.tab_widget.addTab(self.method_tab, "Method Selection")
-        
+
+        # Connect Signals
+        self.matrix_tab.matrix_changed.connect(self.on_matrix_changed)
+        self.method_tab.methods_executed.connect(self.on_methods_executed)
+    
+
         # Results tab
         self.results_tab = QWidget()
         self.tab_widget.addTab(self.results_tab, "Results")
@@ -248,14 +255,46 @@ class MCDMApplication(QMainWindow):
     def on_tab_changed(self, index):
         """Handle tab changes to sync data"""
         if index == 1:  # Decision Matrix tab
-            # MEJORADO: Siempre actualizar la matriz cuando se cambia a esta pestaña
             if hasattr(self, 'matrix_tab'):
                 self.matrix_tab.load_matrix_data()
+        elif index == 2:  # Method Selection tab - AÑADIDO
+            if hasattr(self, 'method_tab'):
+                self.method_tab.refresh_on_tab_change()
         
         # Actualizar status bar según la pestaña
         tab_names = ["Project Manager", "Decision Matrix", "Method Selection", "Results", "Visualization", "Sensitivity Analysis"]
         if index < len(tab_names):
             self.statusBar.showMessage(f"Current tab: {tab_names[index]}")
+
+    def on_matrix_changed(self):
+        """Handle matrix changes"""
+        # Refresh method tab status if it's active
+        if self.tab_widget.currentIndex() == 2 and hasattr(self, 'method_tab'):
+            self.method_tab.check_matrix_status()
+
+    def on_methods_executed(self, results):
+        """Handle methods execution completion"""
+        # Switch to results tab
+        self.tab_widget.setCurrentIndex(3)
+        
+        # TODO: Update results tab with the results
+        self.statusBar.showMessage(f"Executed {len(results)} methods successfully")
+
+    # Actualizar el método execute_method en los menús
+    def execute_method(self, method_name):
+        """Execute a specific method from menu"""
+        self.statusBar.showMessage(f"Executing {method_name} method...")
+        
+        # Switch to method tab
+        self.tab_widget.setCurrentIndex(2)
+        
+        # Execute the method
+        if hasattr(self, 'method_tab'):
+            # Select and execute the specific method
+            if method_name in self.method_tab.method_cards:
+                card = self.method_tab.method_cards[method_name]
+                card.select_cb.setChecked(True)
+                self.method_tab.execute_single_method(method_name)
 
     def project_changed(self):
         """Call this method whenever the project changes"""

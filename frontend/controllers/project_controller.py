@@ -121,3 +121,41 @@ class ProjectController:
         if not self.current_project_id:
             return False
         return self.api_client.update_matrix_values(self.current_project_id, updates)
+    
+    def get_available_methods(self):
+        """Get all available MCDM methods"""
+        return self.api_client.get_available_methods()
+
+    def execute_method(self, method_name, parameters=None):
+        """Execute a specific MCDM method on current project"""
+        if not self.current_project_id:
+            return None
+        return self.api_client.execute_method(self.current_project_id, method_name, parameters)
+
+    def execute_all_methods(self, parameters=None):
+        """Execute all MCDM methods on current project"""
+        if not self.current_project_id:
+            return {}
+        return self.api_client.execute_all_methods(self.current_project_id, parameters)
+
+    def compare_methods(self, method_names=None):
+        """Compare results from multiple methods"""
+        if not self.current_project_id:
+            return {}
+        return self.api_client.compare_methods(self.current_project_id, method_names)
+
+    def get_method_results(self, method_name=None):
+        """Get results for a specific method or all methods"""
+        if not self.current_project_id:
+            return {}
+        return self.api_client.get_method_results(self.current_project_id, method_name)
+
+    def perform_sensitivity_analysis(self, method_name, criteria_id, 
+                                min_weight=0.1, max_weight=1.0, steps=10):
+        """Perform sensitivity analysis on current project"""
+        if not self.current_project_id:
+            return {}
+        return self.api_client.perform_sensitivity_analysis(
+            self.current_project_id, method_name, criteria_id, 
+            min_weight, max_weight, steps
+        )

@@ -1,0 +1,38 @@
+=== VALIDACIÓN ELECTRE: RANKING DE PROYECTOS EMPRESARIALES ===
+Referencia: ResearchGate - 'Ranking Projects Using the ELECTRE Method'
+URL: https://www.researchgate.net/publication/[ID]
+
+PESOS DE CRITERIOS:
+  Inversión Inicial: 0.200
+  VPN (Valor Presente Neto): 0.250
+  Tiempo de Implementación: 0.150
+  Impacto Estratégico: 0.200
+  Riesgo Técnico: 0.100
+  Beneficio Social: 0.100
+
+RANKING ELECTRE I:
+  1. Proyecto Infraestructura Digital (Score: 0.4000)
+  2. Proyecto Eficiencia Energética (Score: 0.4000)
+  3. Proyecto Energía Renovable (Score: 0.4000)
+  4. Proyecto Smart Grid (Score: -0.2000)
+  5. Proyecto Expansión Red (Score: -0.2000)
+  6. Proyecto Modernización Grid (Score: -0.8000)
+
+RANKING ELECTRE III:
+  1. Proyecto Eficiencia Energética (Score: 0.2257)
+  2. Proyecto Infraestructura Digital (Score: 0.1813)
+  3. Proyecto Energía Renovable (Score: 0.1761)
+  4. Proyecto Smart Grid (Score: -0.0271)
+  5. Proyecto Expansión Red (Score: -0.2143)
+  6. Proyecto Modernización Grid (Score: -0.3417)
+
+NÚCLEO ELECTRE I (3 alternativas):
+  - Proyecto Energía Renovable
+  - Proyecto Eficiencia Energética
+  - Proyecto Infraestructura Digital
+
+VALIDACIÓN:
+  Coincidencias Top 3: 3/3
+  Matches expectativas I: 2/3
+  Matches expectativas III: 2/3
+  Test sentido común: 4/4

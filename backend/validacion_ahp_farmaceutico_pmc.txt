@@ -1,0 +1,30 @@
+=== VALIDACIÓN AHP: PROVEEDORES FARMACÉUTICOS ===
+Referencia: PMC - 'Addressing the supplier selection problem by using AHP'
+URL: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC[ID]/
+
+PESOS DE CRITERIOS:
+  Costo: 0.1706
+  Calidad: 0.3111
+  Tiempo de Entrega: 0.1034
+  Flexibilidad: 0.3317
+  Comunicación: 0.0832
+
+RANKING COMPLETO:
+  1. Spark Printers (Score: 9.3328)
+  2. Marvelous Printers Limited (Score: 8.7664)
+  3. Lutfur Enterprise (Score: 8.3033)
+  4. Digital Print Pro (Score: 7.9617)
+  5. Quality Solutions Ltd (Score: 7.7780)
+  6. Express Print House (Score: 7.4966)
+  7. Professional Graphics (Score: 7.1966)
+  8. Reliable Suppliers Inc (Score: 6.8381)
+  9. Premium Print Services (Score: 6.5381)
+  10. Standard Solutions (Score: 6.1381)
+
+CONSISTENCIA:
+  CI: 0.0572, CR: 0.0510, Consistente: True
+
+VALIDACIÓN:
+  Spark Printers es mejor: True
+  Score Spark: 9.3328 (esperado: 0.968)
+  Coincidencias Top 3: 3/3

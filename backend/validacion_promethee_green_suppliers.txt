@@ -1,0 +1,26 @@
+VALIDACIÓN PROMETHEE - CASO PROVEEDORES VERDES
+==================================================
+Referencia: DOI 10.1007/s40092-018-0289-z
+Journal of Industrial Engineering International (2019)
+
+PROVEEDORES EVALUADOS:
+A1: MVG Food Marketing Sdn Bhd - Vegan organic frozen food supplier
+A2: CF org Noodle Sdn Bhd - Noodle manufacturer company
+A3: Hexa Food Sdn Bhd - Spice, herb and seasoning manufacturer
+A4: SCS Food Manufacturing Sdn Bhd - Sugar and salt manufacturer
+
+RESULTADOS OBTENIDOS:
+A1: Flujo neto = 0.620000
+A2: Flujo neto = -0.153333
+A3: Flujo neto = 0.213333
+A4: Flujo neto = -0.680000
+
+Ranking final:
+1. A1 - MVG Food Marketing Sdn Bhd (Score: 0.620000)
+2. A3 - Hexa Food Sdn Bhd (Score: 0.213333)
+3. A2 - CF org Noodle Sdn Bhd (Score: -0.153333)
+4. A4 - SCS Food Manufacturing Sdn Bhd (Score: -0.680000)
+
+Mejor alternativa: A1 - MVG Food Marketing Sdn Bhd
+¿Coincide con artículo (A1 mejor)? SÍ
+Validación: EXITOSA
