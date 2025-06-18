@@ -1,0 +1,293 @@
+{
+  "id": "ebfd387f-6932-4433-a4eb-c4b4d3b4a0d0",
+  "name": "ventas1",
+  "description": "mejores ventas",
+  "decision_maker": "Diego",
+  "created_at": "2025-06-18T10:34:17.162712",
+  "updated_at": "2025-06-18T11:16:00.091756",
+  "alternatives": [
+    {
+      "id": "A1",
+      "name": "ropa",
+      "description": "dvsa",
+      "metadata": {}
+    },
+    {
+      "id": "A2",
+      "name": "asdga",
+      "description": "dsagagd",
+      "metadata": {}
+    }
+  ],
+  "criteria": [
+    {
+      "id": "C1",
+      "name": "demanda",
+      "description": "",
+      "optimization_type": "maximize",
+      "scale_type": "quantitative",
+      "weight": 1.0,
+      "unit": "",
+      "metadata": {}
+    },
+    {
+      "id": "C2",
+      "name": "dsaga",
+      "description": "",
+      "optimization_type": "minimize",
+      "scale_type": "quantitative",
+      "weight": 1.0,
+      "unit": "",
+      "metadata": {}
+    }
+  ],
+  "metadata": {
+    "criteria_config": {
+      "C1": {
+        "scale_type": "Numeric (Continuous)",
+        "min_value": 0.0,
+        "max_value": 100.0,
+        "unit": ""
+      },
+      "C2": {
+        "scale_type": "Numeric (Continuous)",
+        "min_value": 0.0,
+        "max_value": 100.0,
+        "unit": ""
+      }
+    }
+  },
+  "results": {
+    "TOPSIS": {
+      "method_name": "TOPSIS",
+      "alternative_ids": [
+        "A1",
+        "A2"
+      ],
+      "alternative_names": [
+        "ropa",
+        "asdga"
+      ],
+      "scores": [
+        0.0,
+        1.0
+      ],
+      "rankings": [
+        2,
+        1
+      ],
+      "execution_time": 0.0,
+      "parameters": {
+        "normalization_method": "vector",
+        "normalize_matrix": true,
+        "distance_metric": "euclidean",
+        "apply_weights_after_normalization": true,
+        "consider_criteria_type": true
+      },
+      "created_at": "2025-06-18T11:10:47.978924",
+      "metadata": {
+        "normalized_values": [
+          [
+            0.4008188340197078,
+            -0.7071067811865475
+          ],
+          [
+            0.9161573349021892,
+            -0.7071067811865475
+          ]
+        ],
+        "weighted_values": [
+          [
+            0.2004094170098539,
+            -0.35355339059327373
+          ],
+          [
+            0.4580786674510946,
+            -0.35355339059327373
+          ]
+        ],
+        "ideal_positive": [
+          0.4580786674510946,
+          -0.35355339059327373
+        ],
+        "ideal_negative": [
+          0.2004094170098539,
+          -0.35355339059327373
+        ],
+        "distances_positive": [
+          0.25766925044124067,
+          0.0
+        ],
+        "distances_negative": [
+          0.0,
+          0.25766925044124067
+        ],
+        "execution_time": 0.00042724609375
+      }
+    },
+    "ELECTRE": {
+      "method_name": "ELECTRE-I",
+      "alternative_ids": [
+        "A1",
+        "A2"
+      ],
+      "alternative_names": [
+        "ropa",
+        "asdga"
+      ],
+      "scores": [
+        -1.0,
+        1.0
+      ],
+      "rankings": [
+        2,
+        1
+      ],
+      "execution_time": 0.0,
+      "parameters": {
+        "variant": "I",
+        "concordance_threshold": 0.7,
+        "discordance_threshold": 0.3,
+        "normalization_method": "minimax",
+        "normalize_matrix": true,
+        "preference_threshold": null,
+        "indifference_threshold": null,
+        "veto_thresholds": null,
+        "scoring_method": "net_flow",
+        "dominance_weight": 0.6
+      },
+      "created_at": "2025-06-18T11:15:57.755013",
+      "metadata": {
+        "outranking_matrix": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0
+          ]
+        ],
+        "dominance_matrix": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0
+          ]
+        ],
+        "non_dominated_alternatives": [
+          1
+        ],
+        "execution_time": 0.00041174888610839844
+      }
+    },
+    "PROMETHEE": {
+      "method_name": "PROMETHEE-II",
+      "alternative_ids": [
+        "A1",
+        "A2"
+      ],
+      "alternative_names": [
+        "ropa",
+        "asdga"
+      ],
+      "scores": [
+        -0.5,
+        0.5
+      ],
+      "rankings": [
+        2,
+        1
+      ],
+      "execution_time": 0.0,
+      "parameters": {
+        "variant": "II",
+        "default_preference_function": "v-shape",
+        "preference_functions": null,
+        "p_thresholds": null,
+        "q_thresholds": null,
+        "s_thresholds": null,
+        "normalization_method": "minimax",
+        "normalize_matrix": true
+      },
+      "created_at": "2025-06-18T11:16:00.091720",
+      "metadata": {
+        "positive_flow": [
+          0.0,
+          0.5
+        ],
+        "negative_flow": [
+          0.5,
+          0.0
+        ],
+        "net_flow": [
+          -0.5,
+          0.5
+        ],
+        "preference_matrix": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.5,
+            0.0
+          ]
+        ],
+        "execution_time": 0.00023555755615234375
+      }
+    }
+  },
+  "decision_matrix": {
+    "name": "Matriz de ventas1",
+    "alternatives": [
+      {
+        "id": "A1",
+        "name": "ropa",
+        "description": "dvsa",
+        "metadata": {}
+      },
+      {
+        "id": "A2",
+        "name": "asdga",
+        "description": "dsagagd",
+        "metadata": {}
+      }
+    ],
+    "criteria": [
+      {
+        "id": "C1",
+        "name": "demanda",
+        "description": "",
+        "optimization_type": "maximize",
+        "scale_type": "quantitative",
+        "weight": 1.0,
+        "unit": "",
+        "metadata": {}
+      },
+      {
+        "id": "C2",
+        "name": "dsaga",
+        "description": "",
+        "optimization_type": "minimize",
+        "scale_type": "quantitative",
+        "weight": 1.0,
+        "unit": "",
+        "metadata": {}
+      }
+    ],
+    "values": [
+      [
+        14.0,
+        55.0
+      ],
+      [
+        32.0,
+        55.0
+      ]
+    ]
+  }
+}

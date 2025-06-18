@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                             QMenu, QAction, QFileDialog, QProgressDialog)
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QAbstractTableModel, QModelIndex, QVariant
 from PyQt5.QtGui import QFont, QColor, QIcon, QPalette, QBrush
-from PyQt5.QtChart import QChart, QChartView, QBarSeries, QBarSet, QValueAxis, QBarCategoryAxis
+
 import json
 import csv
 import pandas as pd
@@ -16,6 +16,14 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 import numpy as np
 import logging
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+import seaborn as sns
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +57,8 @@ class ResultsTableModel(QAbstractTableModel):
         return len(self.alternatives)
     
     def columnCount(self, parent=QModelIndex()):
-        return len(self.method_names) * 2 + 2  # Name + (Rank, Score) for each method + Avg Rank
+        # Alternative name + (rank, score) for each method + average
+        return 1 + len(self.method_names) * 2 + 1
     
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid():
@@ -58,71 +67,46 @@ class ResultsTableModel(QAbstractTableModel):
         row = index.row()
         col = index.column()
         
-        if row >= len(self.alternatives):
-            return QVariant()
-        
-        alternative = self.alternatives[row]
-        
         if role == Qt.DisplayRole:
             if col == 0:  # Alternative name
-                return alternative.get('name', '')
-            
-            elif col == self.columnCount() - 1:  # Average ranking
-                rankings = []
-                for method_name in self.method_names:
-                    result = self.results_data.get(method_name, {})
-                    alts = result.get('alternatives', [])
-                    for alt in alts:
-                        if alt['id'] == alternative['id']:
-                            rankings.append(alt.get('ranking', 0))
-                            break
-                
-                if rankings:
-                    avg_rank = sum(rankings) / len(rankings)
-                    return f"{avg_rank:.2f}"
-                return ""
-            
-            else:  # Method results
+                return self.alternatives[row].get('name', '')
+            elif col < len(self.method_names) * 2 + 1:  # Method results
                 method_idx = (col - 1) // 2
                 is_score = (col - 1) % 2 == 1
                 
-                if method_idx < len(self.method_names):
-                    method_name = self.method_names[method_idx]
-                    result = self.results_data.get(method_name, {})
-                    alts = result.get('alternatives', [])
-                    
-                    for alt in alts:
-                        if alt['id'] == alternative['id']:
-                            if is_score:
-                                return f"{alt.get('score', 0):.4f}"
-                            else:
-                                return str(alt.get('ranking', '-'))
+                method_name = self.method_names[method_idx]
+                method_result = self.results_data[method_name]
                 
-                return ""
+                # Find the alternative in method results
+                alt_id = self.alternatives[row]['id']
+                for alt in method_result.get('alternatives', []):
+                    if alt['id'] == alt_id:
+                        if is_score:
+                            return f"{alt.get('score', 0):.4f}"
+                        else:
+                            return str(alt.get('ranking', '-'))
+                
+                return '-'
+            else:  # Average rank
+                ranks = []
+                alt_id = self.alternatives[row]['id']
+                
+                for method_name in self.method_names:
+                    method_result = self.results_data[method_name]
+                    for alt in method_result.get('alternatives', []):
+                        if alt['id'] == alt_id:
+                            ranks.append(alt.get('ranking', 0))
+                            break
+                
+                if ranks:
+                    return f"{sum(ranks) / len(ranks):.2f}"
+                return '-'
         
         elif role == Qt.BackgroundRole:
-            if col > 0 and col < self.columnCount() - 1:
-                method_idx = (col - 1) // 2
-                is_ranking = (col - 1) % 2 == 0
-                
-                if is_ranking and method_idx < len(self.method_names):
-                    method_name = self.method_names[method_idx]
-                    result = self.results_data.get(method_name, {})
-                    alts = result.get('alternatives', [])
-                    
-                    for alt in alts:
-                        if alt['id'] == alternative['id']:
-                            ranking = alt.get('ranking', 0)
-                            if ranking == 1:
-                                return QBrush(QColor(200, 255, 200))  # Green
-                            elif ranking == 2:
-                                return QBrush(QColor(255, 255, 200))  # Yellow
-                            elif ranking == 3:
-                                return QBrush(QColor(255, 220, 200))  # Orange
-        
-        elif role == Qt.TextAlignmentRole:
-            if col > 0:
-                return Qt.AlignCenter
+            if col == 0:
+                return QColor(240, 240, 240)
+            elif col == self.columnCount() - 1:
+                return QColor(230, 230, 250)
         
         elif role == Qt.FontRole:
             if col == 0 or col == self.columnCount() - 1:
@@ -136,21 +120,19 @@ class ResultsTableModel(QAbstractTableModel):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
             if section == 0:
                 return "Alternative"
-            elif section == self.columnCount() - 1:
-                return "Avg. Rank"
-            else:
+            elif section < len(self.method_names) * 2 + 1:
                 method_idx = (section - 1) // 2
                 is_score = (section - 1) % 2 == 1
-                
-                if method_idx < len(self.method_names):
-                    method_name = self.method_names[method_idx]
-                    return f"{method_name}\n{'Score' if is_score else 'Rank'}"
+                method_name = self.method_names[method_idx]
+                return f"{method_name}\n{'Score' if is_score else 'Rank'}"
+            else:
+                return "Avg.\nRank"
         
         return QVariant()
 
 
 class ResultDetailsWidget(QWidget):
-    """Widget to show detailed results for a specific method"""
+    """Widget to display detailed results for a single method"""
     
     def __init__(self, method_name: str, result_data: Dict, parent=None):
         super().__init__(parent)
@@ -161,114 +143,157 @@ class ResultDetailsWidget(QWidget):
     def init_ui(self):
         layout = QVBoxLayout(self)
         
-        # Header
-        header_frame = QFrame()
-        header_frame.setStyleSheet("""
-            QFrame {
-                background-color: #e3f2fd;
-                border-radius: 5px;
-                padding: 10px;
-            }
-        """)
-        header_layout = QVBoxLayout(header_frame)
-        
-        # Method name
-        method_label = QLabel(self.method_name)
-        method_label.setFont(QFont("Arial", 14, QFont.Bold))
-        header_layout.addWidget(method_label)
+        # Method title
+        title = QLabel(f"Method: {self.method_name}")
+        title.setFont(QFont("Arial", 12, QFont.Bold))
+        layout.addWidget(title)
         
         # Execution info
+        exec_info = QFrame()
+        exec_info.setFrameStyle(QFrame.Box)
+        exec_layout = QGridLayout(exec_info)
+        
+        # Execution time
         exec_time = self.result_data.get('execution_time', 0)
-        exec_info = QLabel(f"Execution time: {exec_time:.3f}s")
-        exec_info.setStyleSheet("color: #666;")
-        header_layout.addWidget(exec_info)
+        exec_layout.addWidget(QLabel("Execution Time:"), 0, 0)
+        exec_layout.addWidget(QLabel(f"{exec_time:.3f} seconds"), 0, 1)
         
-        layout.addWidget(header_frame)
+        # Timestamp
+        timestamp = self.result_data.get('timestamp', '')
+        exec_layout.addWidget(QLabel("Timestamp:"), 0, 2)
+        exec_layout.addWidget(QLabel(timestamp), 0, 3)
         
-        # Best alternative highlight
-        best_alt = self.result_data.get('best_alternative', {})
-        if best_alt:
-            best_frame = QFrame()
-            best_frame.setStyleSheet("""
-                QFrame {
-                    background-color: #c8e6c9;
-                    border: 2px solid #4CAF50;
-                    border-radius: 5px;
-                    padding: 10px;
-                }
-            """)
-            best_layout = QVBoxLayout(best_frame)
-            
-            best_title = QLabel("🏆 Best Alternative")
-            best_title.setFont(QFont("Arial", 12, QFont.Bold))
-            best_layout.addWidget(best_title)
-            
-            best_info = QLabel(f"{best_alt.get('name', 'Unknown')} (Score: {best_alt.get('score', 0):.4f})")
-            best_layout.addWidget(best_info)
-            
-            layout.addWidget(best_frame)
-        
-        # Parameters used
+        # Method-specific parameters
         params = self.result_data.get('parameters', {})
         if params:
-            params_group = QGroupBox("Parameters Used")
-            params_layout = QVBoxLayout()
-            
-            params_text = QTextEdit()
-            params_text.setReadOnly(True)
-            params_text.setMaximumHeight(150)
-            
-            params_str = json.dumps(params, indent=2)
-            params_text.setPlainText(params_str)
-            
-            params_layout.addWidget(params_text)
-            params_group.setLayout(params_layout)
-            layout.addWidget(params_group)
+            exec_layout.addWidget(QLabel("Parameters:"), 1, 0)
+            param_text = ", ".join([f"{k}: {v}" for k, v in params.items()])
+            param_label = QLabel(param_text)
+            param_label.setWordWrap(True)
+            exec_layout.addWidget(param_label, 1, 1, 1, 3)
         
-        # Detailed rankings table
-        rankings_group = QGroupBox("Detailed Rankings")
+        layout.addWidget(exec_info)
+        
+        # Rankings table
+        rankings_group = QGroupBox("Rankings")
         rankings_layout = QVBoxLayout()
         
         rankings_table = QTableWidget()
         alternatives = self.result_data.get('alternatives', [])
-        
         rankings_table.setRowCount(len(alternatives))
-        rankings_table.setColumnCount(4)
-        rankings_table.setHorizontalHeaderLabels(["Rank", "Alternative", "Score", "Gap to Best"])
+        rankings_table.setColumnCount(3)
+        rankings_table.setHorizontalHeaderLabels(["Rank", "Alternative", "Score"])
         
-        for i, alt in enumerate(alternatives):
-            rankings_table.setItem(i, 0, QTableWidgetItem(str(alt.get('ranking', '-'))))
-            rankings_table.setItem(i, 1, QTableWidgetItem(alt.get('name', '')))
+        # Sort by ranking
+        sorted_alts = sorted(alternatives, key=lambda x: x.get('ranking', 999))
+        
+        for row, alt in enumerate(sorted_alts):
+            # Rank
+            rank_item = QTableWidgetItem(str(alt.get('ranking', '-')))
+            rank_item.setTextAlignment(Qt.AlignCenter)
             
-            score = alt.get('score', 0)
-            score_item = QTableWidgetItem(f"{score:.4f}")
-            rankings_table.setItem(i, 2, score_item)
-            
-            # Gap to best
-            if i == 0:
-                gap_item = QTableWidgetItem("-")
-            else:
-                best_score = alternatives[0].get('score', 0)
-                gap = ((best_score - score) / best_score * 100) if best_score > 0 else 0
-                gap_item = QTableWidgetItem(f"{gap:.1f}%")
-            
-            rankings_table.setItem(i, 3, gap_item)
-            
-            # Color first three rows
+            # Color based on rank
             if alt.get('ranking') == 1:
-                for j in range(4):
-                    rankings_table.item(i, j).setBackground(QColor(200, 255, 200))
+                rank_item.setBackground(QColor(255, 215, 0))  # Gold
             elif alt.get('ranking') == 2:
-                for j in range(4):
-                    rankings_table.item(i, j).setBackground(QColor(255, 255, 200))
+                rank_item.setBackground(QColor(192, 192, 192))  # Silver
             elif alt.get('ranking') == 3:
-                for j in range(4):
-                    rankings_table.item(i, j).setBackground(QColor(255, 220, 200))
+                rank_item.setBackground(QColor(205, 127, 50))  # Bronze
+            
+            rankings_table.setItem(row, 0, rank_item)
+            
+            # Alternative name
+            name_item = QTableWidgetItem(alt.get('name', ''))
+            rankings_table.setItem(row, 1, name_item)
+            
+            # Score
+            score_item = QTableWidgetItem(f"{alt.get('score', 0):.6f}")
+            score_item.setTextAlignment(Qt.AlignRight)
+            rankings_table.setItem(row, 2, score_item)
         
         rankings_table.resizeColumnsToContents()
         rankings_layout.addWidget(rankings_table)
         rankings_group.setLayout(rankings_layout)
         layout.addWidget(rankings_group)
+        
+        # Method-specific details
+        self.add_method_specific_details(layout)
+    
+    def add_method_specific_details(self, layout):
+        """Add method-specific details based on the method type"""
+        details_group = QGroupBox("Method Details")
+        details_layout = QVBoxLayout()
+        
+        if self.method_name == "AHP":
+            self.add_ahp_details(details_layout)
+        elif self.method_name == "TOPSIS":
+            self.add_topsis_details(details_layout)
+        elif self.method_name == "PROMETHEE":
+            self.add_promethee_details(details_layout)
+        elif self.method_name == "ELECTRE":
+            self.add_electre_details(details_layout)
+        
+        if details_layout.count() > 0:
+            details_group.setLayout(details_layout)
+            layout.addWidget(details_group)
+    
+    def add_ahp_details(self, layout):
+        """Add AHP-specific details"""
+        # Consistency ratio
+        cr = self.result_data.get('consistency_ratio', 0)
+        cr_label = QLabel(f"Consistency Ratio: {cr:.4f}")
+        
+        if cr <= 0.1:
+            cr_label.setStyleSheet("color: green; font-weight: bold;")
+            cr_label.setText(cr_label.text() + " ✓ (Consistent)")
+        else:
+            cr_label.setStyleSheet("color: red; font-weight: bold;")
+            cr_label.setText(cr_label.text() + " ✗ (Inconsistent)")
+        
+        layout.addWidget(cr_label)
+        
+        # Lambda max
+        lambda_max = self.result_data.get('lambda_max', 0)
+        layout.addWidget(QLabel(f"λ_max: {lambda_max:.4f}"))
+    
+    def add_topsis_details(self, layout):
+        """Add TOPSIS-specific details"""
+        # Ideal solutions
+        ideal_positive = self.result_data.get('ideal_positive', [])
+        ideal_negative = self.result_data.get('ideal_negative', [])
+        
+        if ideal_positive:
+            layout.addWidget(QLabel("Ideal Positive Solution:"))
+            pos_text = ", ".join([f"{v:.4f}" for v in ideal_positive])
+            layout.addWidget(QLabel(pos_text))
+        
+        if ideal_negative:
+            layout.addWidget(QLabel("Ideal Negative Solution:"))
+            neg_text = ", ".join([f"{v:.4f}" for v in ideal_negative])
+            layout.addWidget(QLabel(neg_text))
+    
+    def add_promethee_details(self, layout):
+        """Add PROMETHEE-specific details"""
+        # Preference function used
+        pref_func = self.result_data.get('preference_function', 'Usual')
+        layout.addWidget(QLabel(f"Preference Function: {pref_func}"))
+        
+        # Thresholds if any
+        thresholds = self.result_data.get('thresholds', {})
+        if thresholds:
+            layout.addWidget(QLabel("Thresholds:"))
+            for criterion, values in thresholds.items():
+                layout.addWidget(QLabel(f"  {criterion}: {values}"))
+    
+    def add_electre_details(self, layout):
+        """Add ELECTRE-specific details"""
+        # Concordance threshold
+        c_threshold = self.result_data.get('concordance_threshold', 0)
+        layout.addWidget(QLabel(f"Concordance Threshold: {c_threshold:.3f}"))
+        
+        # Discordance threshold
+        d_threshold = self.result_data.get('discordance_threshold', 0)
+        layout.addWidget(QLabel(f"Discordance Threshold: {d_threshold:.3f}"))
 
 
 class ConsensusAnalysisWidget(QWidget):
@@ -419,37 +444,36 @@ class ConsensusAnalysisWidget(QWidget):
         
         # Extract rankings for each method
         rankings_matrix = []
-        alternatives = self.results_data[method_names[0]].get('alternatives', [])
-        n_alternatives = len(alternatives)
+        top_alternatives = []
         
         for method_name in method_names:
             result = self.results_data[method_name]
-            method_rankings = []
+            alternatives = result.get('alternatives', [])
             
-            for alt in alternatives:
-                alt_id = alt['id']
-                # Find ranking for this alternative in this method
-                method_alts = result.get('alternatives', [])
-                for method_alt in method_alts:
-                    if method_alt['id'] == alt_id:
-                        method_rankings.append(method_alt.get('ranking', n_alternatives))
-                        break
+            # Sort by ranking
+            sorted_alts = sorted(alternatives, key=lambda x: x.get('ranking', 999))
             
-            rankings_matrix.append(method_rankings)
+            # Extract rankings
+            rankings = [alt.get('ranking', 0) for alt in sorted_alts]
+            rankings_matrix.append(rankings)
+            
+            # Get top alternative
+            if sorted_alts:
+                top_alternatives.append(sorted_alts[0].get('id'))
         
-        rankings_array = np.array(rankings_matrix)
+        # Convert to numpy array
+        rankings_matrix = np.array(rankings_matrix)
+        n_alternatives = rankings_matrix.shape[1]
         
         # Calculate Kendall's W
-        mean_rank = np.mean(rankings_array, axis=0)
-        ss_total = np.sum((rankings_array - mean_rank) ** 2)
+        mean_rank = np.mean(rankings_matrix, axis=0)
+        ss_total = np.sum((rankings_matrix - mean_rank) ** 2)
         kendalls_w = (12 * ss_total) / (n_methods ** 2 * (n_alternatives ** 3 - n_alternatives))
         
         # Calculate top alternative agreement
-        top_choices = [np.argmin(rankings) for rankings in rankings_matrix]
-        most_common_top = max(set(top_choices), key=top_choices.count)
-        top_agreement = top_choices.count(most_common_top) / n_methods
+        top_agreement = len([x for x in top_alternatives if x == top_alternatives[0]]) / len(top_alternatives)
         
-        # Calculate correlation matrix
+        # Calculate pairwise correlations
         correlation_matrix = np.zeros((n_methods, n_methods))
         for i in range(n_methods):
             for j in range(n_methods):
@@ -510,6 +534,7 @@ class ResultsTab(QWidget):
         self.project_controller = project_controller
         self.results_data = {}
         self.filtered_results = {}
+        self.method_tabs = {}
         self.init_ui()
     
     def init_ui(self):
@@ -586,77 +611,60 @@ class ResultsTab(QWidget):
         
         # Methods executed card
         self.methods_card = self.create_summary_card(
-            "📊 Methods",
+            "Methods Executed",
             "0",
-            "Executed",
-            QColor(33, 150, 243)
+            "#2196F3"
         )
         summary_layout.addWidget(self.methods_card)
         
-        # Alternatives evaluated card
-        self.alternatives_card = self.create_summary_card(
-            "🎯 Alternatives",
-            "0",
-            "Evaluated",
-            QColor(76, 175, 80)
-        )
-        summary_layout.addWidget(self.alternatives_card)
-        
-        # Consensus level card
-        self.consensus_card = self.create_summary_card(
-            "🤝 Consensus",
-            "N/A",
-            "Agreement",
-            QColor(255, 152, 0)
-        )
-        summary_layout.addWidget(self.consensus_card)
-        
         # Best alternative card
         self.best_alt_card = self.create_summary_card(
-            "🏆 Best Choice",
-            "None",
-            "Top Alternative",
-            QColor(156, 39, 176)
+            "Best Alternative",
+            "-",
+            "#4CAF50"
         )
         summary_layout.addWidget(self.best_alt_card)
         
+        # Consensus level card
+        self.consensus_card = self.create_summary_card(
+            "Consensus Level",
+            "-",
+            "#FF9800"
+        )
+        summary_layout.addWidget(self.consensus_card)
+        
+        # Execution time card
+        self.exec_time_card = self.create_summary_card(
+            "Total Exec. Time",
+            "0.0s",
+            "#9C27B0"
+        )
+        summary_layout.addWidget(self.exec_time_card)
+        
         parent_layout.addWidget(summary_frame)
     
-    def create_summary_card(self, icon: str, value: str, label: str, color: QColor) -> QFrame:
-        """Create a summary information card"""
+    def create_summary_card(self, label_text: str, value_text: str, color: str) -> QFrame:
+        """Create a summary display card"""
         card = QFrame()
-        card.setMinimumHeight(100)
         card.setStyleSheet(f"""
             QFrame {{
                 background-color: white;
-                border: 2px solid {color.name()};
+                border: 2px solid {color};
                 border-radius: 8px;
                 padding: 15px;
-            }}
-            QFrame:hover {{
-                background-color: #f8f9fa;
+                min-width: 150px;
             }}
         """)
         
         card_layout = QVBoxLayout(card)
         
-        # Icon and label
-        header_layout = QHBoxLayout()
-        icon_label = QLabel(icon)
-        icon_label.setFont(QFont("Arial", 20))
-        header_layout.addWidget(icon_label)
+        label = QLabel(label_text)
+        label.setStyleSheet("color: #666; font-size: 11px;")
+        card_layout.addWidget(label)
         
-        label_text = QLabel(label)
-        label_text.setStyleSheet("color: #666;")
-        header_layout.addWidget(label_text)
-        header_layout.addStretch()
-        
-        card_layout.addLayout(header_layout)
-        
-        # Value
-        value_label = QLabel(value)
-        value_label.setFont(QFont("Arial", 18, QFont.Bold))
-        value_label.setStyleSheet(f"color: {color.name()};")
+        value_label = QLabel(value_text)
+        value_label.setFont(QFont("Arial", 16, QFont.Bold))
+        value_label.setStyleSheet(f"color: {color};")
         card_layout.addWidget(value_label)
         
         # Store labels for updates
@@ -720,8 +728,7 @@ class ResultsTab(QWidget):
         
         self.results_tabs.addTab(self.comparison_widget, "📊 Comparison Table")
         
-        # Individual method details tabs
-        self.method_tabs = {}
+        # Individual method details tabs will be added dynamically
         
         # Consensus analysis tab
         self.consensus_widget = QWidget()
@@ -731,6 +738,12 @@ class ResultsTab(QWidget):
         # Charts tab
         self.charts_widget = QWidget()
         self.charts_layout = QVBoxLayout(self.charts_widget)
+        self.charts_scroll = QScrollArea()
+        self.charts_scroll.setWidgetResizable(True)
+        self.charts_content = QWidget()
+        self.charts_content_layout = QVBoxLayout(self.charts_content)
+        self.charts_scroll.setWidget(self.charts_content)
+        self.charts_layout.addWidget(self.charts_scroll)
         self.results_tabs.addTab(self.charts_widget, "📈 Visualizations")
         
         results_layout.addWidget(self.results_tabs)
@@ -791,56 +804,79 @@ class ResultsTab(QWidget):
         parent_layout.addWidget(export_frame)
     
     def load_results(self):
-        """Load results from project controller"""
+        """Load results from the project controller"""
         try:
             if not self.project_controller.current_project_id:
                 self.status_label.setText("No project loaded")
                 return
             
-            # Get all results
-            self.results_data = self.project_controller.get_method_results()
+            # Get results from database
+            results = self.project_controller.get_method_results()
             
-            if not self.results_data:
+            if not results:
                 self.status_label.setText("No results available")
+                self.results_data = {}
+                self.update_display()
                 return
             
-            # Update UI
-            self.update_summary()
-            self.update_filters()
-            self.update_results_display()
-            self.update_consensus_analysis()
-            self.create_visualizations()
+            # Process results
+            self.results_data = {}
+            total_exec_time = 0
             
-            self.status_label.setText(f"Loaded {len(self.results_data)} method results")
-            self.status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            for result in results:
+                method_name = result.get('method_name', 'Unknown')
+                
+                # Parse result data
+                result_data = json.loads(result.get('result_data', '{}'))
+                result_data['timestamp'] = result.get('created_at', '')
+                
+                self.results_data[method_name] = result_data
+                total_exec_time += result_data.get('execution_time', 0)
+            
+            # Update summary cards
+            self.update_summary_cards(total_exec_time)
+            
+            # Update filters
+            self.update_filters()
+            
+            # Update display
+            self.update_display()
+            
+            self.status_label.setText(f"Loaded {len(self.results_data)} results")
             
         except Exception as e:
-            logger.error(f"Error loading results: {e}")
+            logger.error(f"Error loading results: {str(e)}")
             QMessageBox.critical(self, "Error", f"Failed to load results: {str(e)}")
     
-    def update_summary(self):
-        """Update summary cards"""
-        n_methods = len(self.results_data)
-        self.methods_card.value_label.setText(str(n_methods))
+    def update_summary_cards(self, total_exec_time):
+        """Update summary card values"""
+        # Methods executed
+        self.methods_card.value_label.setText(str(len(self.results_data)))
         
-        # Get alternatives count
+        # Best alternative (most frequent #1)
         if self.results_data:
-            first_result = next(iter(self.results_data.values()))
-            n_alternatives = len(first_result.get('alternatives', []))
-            self.alternatives_card.value_label.setText(str(n_alternatives))
-            
-            # Find most common best alternative
-            best_alternatives = {}
-            for method_name, result in self.results_data.items():
-                best_alt = result.get('best_alternative', {})
-                best_name = best_alt.get('name', 'Unknown')
-                best_alternatives[best_name] = best_alternatives.get(best_name, 0) + 1
+            best_alternatives = []
+            for result in self.results_data.values():
+                alts = result.get('alternatives', [])
+                if alts:
+                    sorted_alts = sorted(alts, key=lambda x: x.get('ranking', 999))
+                    if sorted_alts:
+                        best_alternatives.append(sorted_alts[0].get('name', 'Unknown'))
             
             if best_alternatives:
-                most_common = max(best_alternatives, key=best_alternatives.get)
-                count = best_alternatives[most_common]
-                self.best_alt_card.value_label.setText(most_common)
-                self.best_alt_card.label_text.setText(f"Chosen by {count}/{n_methods} methods")
+                from collections import Counter
+                most_common = Counter(best_alternatives).most_common(1)[0]
+                self.best_alt_card.value_label.setText(most_common[0])
+            else:
+                self.best_alt_card.value_label.setText("-")
+        else:
+            self.best_alt_card.value_label.setText("-")
+        
+        # Consensus level (will be updated later)
+        self.consensus_card.value_label.setText("-")
+        
+        # Execution time
+        self.exec_time_card.value_label.setText(f"{total_exec_time:.2f}s")
     
     def update_filters(self):
         """Update filter options"""
@@ -850,44 +886,49 @@ class ResultsTab(QWidget):
         for method_name in self.results_data.keys():
             self.method_filter.addItem(method_name)
     
-    def update_results_display(self):
-        """Update main results display"""
+    def update_display(self):
+        """Update all display components"""
+        # Apply filters first
+        self.apply_filters()
+        
         # Update comparison table
         self.update_comparison_table()
         
-        # Create/update individual method tabs
-        for method_name, result_data in self.results_data.items():
-            if method_name not in self.method_tabs:
-                # Create new tab
-                details_widget = ResultDetailsWidget(method_name, result_data)
-                scroll = QScrollArea()
-                scroll.setWidget(details_widget)
-                scroll.setWidgetResizable(True)
-                
-                index = self.results_tabs.insertTab(
-                    self.results_tabs.count() - 2,  # Before consensus and charts
-                    scroll,
-                    f"📋 {method_name}"
-                )
-                self.method_tabs[method_name] = index
+        # Update/create individual method tabs
+        self.update_method_tabs()
+        
+        # Update consensus analysis
+        self.update_consensus_analysis()
+        
+        # Update visualizations
+        self.update_visualizations()
+    
+    def apply_filters(self):
+        """Apply current filters to results"""
+        selected_method = self.method_filter.currentText()
+        search_text = self.search_input.text().lower()
+        
+        if selected_method == "All Methods":
+            self.filtered_results = self.results_data.copy()
+        else:
+            self.filtered_results = {k: v for k, v in self.results_data.items() 
+                                   if k == selected_method}
+        
+        # Additional filtering based on search can be done here
+        
+        self.update_comparison_table()
     
     def update_comparison_table(self):
-        """Update the comparison table"""
-        # Prepare data for table
-        self.results_table.clear()
-        
-        if not self.results_data:
+        """Update the comparison table with current data"""
+        if not self.filtered_results:
+            self.results_table.clear()
+            self.results_table.setRowCount(0)
+            self.results_table.setColumnCount(0)
             return
         
-        # Get filtered results
-        filtered_results = self.get_filtered_results()
-        
-        # Setup table structure
-        method_names = list(filtered_results.keys())
-        if not method_names:
-            return
-        
-        first_result = filtered_results[method_names[0]]
+        # Get data structure
+        method_names = list(self.filtered_results.keys())
+        first_result = next(iter(self.filtered_results.values()))
         alternatives = first_result.get('alternatives', [])
         
         # Apply search filter to alternatives
@@ -896,8 +937,8 @@ class ResultsTab(QWidget):
             alternatives = [alt for alt in alternatives 
                           if search_text in alt.get('name', '').lower()]
         
-        # Configure table
-        n_cols = len(method_names) * 2 + 2  # Name + (Rank, Score) for each + Avg
+        # Setup table
+        n_cols = 1 + len(method_names) * 2 + 1  # Name + (Rank, Score) for each + Avg
         self.results_table.setRowCount(len(alternatives))
         self.results_table.setColumnCount(n_cols)
         
@@ -905,47 +946,51 @@ class ResultsTab(QWidget):
         headers = ["Alternative"]
         for method in method_names:
             headers.extend([f"{method}\nRank", f"{method}\nScore"])
-        headers.append("Avg. Rank")
+        headers.append("Avg.\nRank")
         self.results_table.setHorizontalHeaderLabels(headers)
         
         # Fill data
         for row, alt in enumerate(alternatives):
             # Alternative name
-            self.results_table.setItem(row, 0, QTableWidgetItem(alt['name']))
+            name_item = QTableWidgetItem(alt.get('name', ''))
+            name_item.setFont(QFont("Arial", 10, QFont.Bold))
+            self.results_table.setItem(row, 0, name_item)
             
-            # Method results
             col = 1
             rankings = []
             
             for method_name in method_names:
-                result = filtered_results[method_name]
+                result = self.filtered_results[method_name]
                 method_alts = result.get('alternatives', [])
                 
-                # Find this alternative in method results
+                # Find matching alternative
                 found = False
                 for method_alt in method_alts:
                     if method_alt['id'] == alt['id']:
-                        # Ranking
-                        rank_item = QTableWidgetItem(str(method_alt.get('ranking', '-')))
+                        # Rank
+                        rank = method_alt.get('ranking', '-')
+                        rank_item = QTableWidgetItem(str(rank))
                         rank_item.setTextAlignment(Qt.AlignCenter)
                         
-                        # Color based on ranking
-                        ranking = method_alt.get('ranking', 0)
-                        if ranking == 1:
-                            rank_item.setBackground(QColor(200, 255, 200))
-                        elif ranking == 2:
-                            rank_item.setBackground(QColor(255, 255, 200))
-                        elif ranking == 3:
-                            rank_item.setBackground(QColor(255, 220, 200))
+                        # Color based on rank
+                        if rank == 1:
+                            rank_item.setBackground(QColor(255, 215, 0))
+                        elif rank == 2:
+                            rank_item.setBackground(QColor(192, 192, 192))
+                        elif rank == 3:
+                            rank_item.setBackground(QColor(205, 127, 50))
                         
                         self.results_table.setItem(row, col, rank_item)
                         
                         # Score
-                        score_item = QTableWidgetItem(f"{method_alt.get('score', 0):.4f}")
-                        score_item.setTextAlignment(Qt.AlignCenter)
+                        score = method_alt.get('score', 0)
+                        score_item = QTableWidgetItem(f"{score:.4f}")
+                        score_item.setTextAlignment(Qt.AlignRight)
                         self.results_table.setItem(row, col + 1, score_item)
                         
-                        rankings.append(ranking)
+                        if isinstance(rank, (int, float)):
+                            rankings.append(rank)
+                        
                         found = True
                         break
                 
@@ -955,7 +1000,7 @@ class ResultsTab(QWidget):
                 
                 col += 2
             
-            # Average ranking
+            # Average rank
             if rankings:
                 avg_rank = sum(rankings) / len(rankings)
                 avg_item = QTableWidgetItem(f"{avg_rank:.2f}")
@@ -966,9 +1011,34 @@ class ResultsTab(QWidget):
         # Resize columns
         self.results_table.resizeColumnsToContents()
     
+    def update_method_tabs(self):
+        """Update individual method result tabs"""
+        # Remove old method tabs
+        indices_to_remove = []
+        for method_name, index in self.method_tabs.items():
+            if method_name not in self.results_data:
+                indices_to_remove.append(index)
+        
+        for index in sorted(indices_to_remove, reverse=True):
+            self.results_tabs.removeTab(index)
+        
+        # Add/update tabs for current results
+        for method_name, result_data in self.results_data.items():
+            if method_name not in self.method_tabs:
+                # Create new tab
+                details_widget = ResultDetailsWidget(method_name, result_data)
+                scroll = QScrollArea()
+                scroll.setWidget(details_widget)
+                scroll.setWidgetResizable(True)
+                
+                # Insert before consensus and charts tabs
+                index = self.results_tabs.count() - 2
+                self.results_tabs.insertTab(index, scroll, f"📋 {method_name}")
+                self.method_tabs[method_name] = index
+    
     def update_consensus_analysis(self):
-        """Update consensus analysis"""
-        # Clear previous analysis
+        """Update consensus analysis tab"""
+        # Clear previous content
         while self.consensus_layout.count():
             child = self.consensus_layout.takeAt(0)
             if child.widget():
@@ -986,20 +1056,22 @@ class ResultsTab(QWidget):
             
             # Update card color based on consensus level
             if kendalls_w >= 0.8:
-                color = QColor(76, 175, 80)
+                color = "#4CAF50"
             elif kendalls_w >= 0.6:
-                color = QColor(255, 193, 7)
+                color = "#FF9800"
             else:
-                color = QColor(244, 67, 54)
+                color = "#f44336"
             
             self.consensus_card.setStyleSheet(f"""
                 QFrame {{
                     background-color: white;
-                    border: 2px solid {color.name()};
+                    border: 2px solid {color};
                     border-radius: 8px;
                     padding: 15px;
+                    min-width: 150px;
                 }}
             """)
+            self.consensus_card.value_label.setStyleSheet(f"color: {color}; font: bold 16px Arial;")
         else:
             info_label = QLabel("Consensus analysis requires at least 2 executed methods")
             info_label.setAlignment(Qt.AlignCenter)
@@ -1012,11 +1084,11 @@ class ResultsTab(QWidget):
             """)
             self.consensus_layout.addWidget(info_label)
     
-    def create_visualizations(self):
-        """Create chart visualizations"""
+    def update_visualizations(self):
+        """Update visualization charts"""
         # Clear previous charts
-        while self.charts_layout.count():
-            child = self.charts_layout.takeAt(0)
+        while self.charts_content_layout.count():
+            child = self.charts_content_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
         
@@ -1028,191 +1100,317 @@ class ResultsTab(QWidget):
         
         # Create scores comparison chart
         self.create_scores_chart()
+        
+        # Create radar chart for top alternatives
+        self.create_radar_chart()
     
     def create_rankings_chart(self):
-        """Create bar chart for rankings comparison"""
+        """Create bar chart comparing rankings across methods"""
         chart = QChart()
         chart.setTitle("Rankings Comparison")
         chart.setAnimationOptions(QChart.SeriesAnimations)
         
         # Prepare data
+        series = QBarSeries()
+        
         method_names = list(self.results_data.keys())
-        if not method_names:
-            return
+        categories = []
         
+        # Get alternatives from first method
         first_result = next(iter(self.results_data.values()))
-        alternatives = first_result.get('alternatives', [])[:5]  # Top 5
+        alternatives = first_result.get('alternatives', [])[:10]  # Limit to top 10
         
-        # Create bar sets for each alternative
-        bar_sets = []
         for alt in alternatives:
-            bar_set = QBarSet(alt['name'])
+            categories.append(alt.get('name', '')[:20])  # Truncate long names
+            
+            bar_set = QBarSet(alt.get('name', ''))
             
             for method_name in method_names:
                 result = self.results_data[method_name]
                 method_alts = result.get('alternatives', [])
                 
                 # Find ranking for this alternative
-                ranking = 0
+                ranking = None
                 for method_alt in method_alts:
                     if method_alt['id'] == alt['id']:
                         ranking = method_alt.get('ranking', 0)
                         break
                 
-                bar_set.append(ranking)
+                bar_set.append(ranking if ranking else 0)
             
-            bar_sets.append(bar_set)
-        
-        # Create series
-        series = QBarSeries()
-        for bar_set in bar_sets:
             series.append(bar_set)
         
         chart.addSeries(series)
         
-        # Configure axes
+        # Axes
         axis_x = QBarCategoryAxis()
         axis_x.append(method_names)
         chart.addAxis(axis_x, Qt.AlignBottom)
         series.attachAxis(axis_x)
         
         axis_y = QValueAxis()
+        axis_y.setRange(0, len(alternatives) + 1)
+        axis_y.setLabelFormat("%d")
         axis_y.setTitleText("Ranking")
-        axis_y.setReverse(True)  # Lower ranking is better
         chart.addAxis(axis_y, Qt.AlignLeft)
         series.attachAxis(axis_y)
         
         # Create chart view
         chart_view = QChartView(chart)
-        chart_view.setRenderHint(chart_view.Antialiasing)
-        chart_view.setMinimumHeight(300)
+        chart_view.setRenderHint(QPainter.Antialiasing)
+        chart_view.setMinimumHeight(400)
         
-        self.charts_layout.addWidget(chart_view)
+        self.charts_content_layout.addWidget(chart_view)
     
     def create_scores_chart(self):
-        """Create bar chart for scores comparison"""
-        # Similar implementation for scores
-        # TODO: Implement scores chart
-        pass
+        """Create line chart comparing scores across methods"""
+        chart = QChart()
+        chart.setTitle("Scores Comparison")
+        chart.setAnimationOptions(QChart.SeriesAnimations)
+        
+        # Get alternatives
+        first_result = next(iter(self.results_data.values()))
+        alternatives = first_result.get('alternatives', [])[:10]  # Limit to top 10
+        
+        # Create series for each method
+        for method_name, result_data in self.results_data.items():
+            series = QLineSeries()
+            series.setName(method_name)
+            
+            method_alts = result_data.get('alternatives', [])
+            
+            for i, alt in enumerate(alternatives):
+                # Find score for this alternative
+                score = 0
+                for method_alt in method_alts:
+                    if method_alt['id'] == alt['id']:
+                        score = method_alt.get('score', 0)
+                        break
+                
+                series.append(i, score)
+            
+            chart.addSeries(series)
+        
+        # Axes
+        axis_x = QValueAxis()
+        axis_x.setRange(0, len(alternatives) - 1)
+        axis_x.setLabelFormat("%d")
+        axis_x.setTitleText("Alternative Index")
+        chart.addAxis(axis_x, Qt.AlignBottom)
+        
+        axis_y = QValueAxis()
+        axis_y.setRange(0, 1)
+        axis_y.setTitleText("Score")
+        chart.addAxis(axis_y, Qt.AlignLeft)
+        
+        # Attach axes to all series
+        for series in chart.series():
+            series.attachAxis(axis_x)
+            series.attachAxis(axis_y)
+        
+        # Create chart view
+        chart_view = QChartView(chart)
+        chart_view.setRenderHint(QPainter.Antialiasing)
+        chart_view.setMinimumHeight(400)
+        
+        self.charts_content_layout.addWidget(chart_view)
+    
+    def create_radar_chart(self):
+        """Create radar chart for top alternatives"""
+        # This would require a custom implementation or external library
+        # For now, create a placeholder
+        info_label = QLabel("Radar chart visualization coming soon...")
+        info_label.setAlignment(Qt.AlignCenter)
+        info_label.setStyleSheet("""
+            QLabel {
+                color: #666;
+                font-style: italic;
+                padding: 20px;
+                background-color: #f5f5f5;
+                border-radius: 5px;
+            }
+        """)
+        self.charts_content_layout.addWidget(info_label)
     
     def get_filtered_results(self) -> Dict[str, Dict]:
-        """Get filtered results based on current filters"""
-        if self.method_filter.currentText() == "All Methods":
-            return self.results_data
-        else:
-            method_name = self.method_filter.currentText()
-            if method_name in self.results_data:
-                return {method_name: self.results_data[method_name]}
-            return {}
-    
-    def apply_filters(self):
-        """Apply current filters"""
-        self.update_comparison_table()
-    
-    def update_display(self):
-        """Update display based on selected mode"""
-        # TODO: Implement different display modes
-        self.update_comparison_table()
+        """Get currently filtered results"""
+        return self.filtered_results if self.filtered_results else self.results_data
     
     def export_results(self, format_type: str):
         """Export results in specified format"""
-        if not self.results_data:
-            QMessageBox.warning(self, "No Data", "No results to export")
-            return
-        
-        # Get file path
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_name = f"MCDM_Results_{timestamp}"
-        
-        if format_type == 'excel':
-            file_path, _ = QFileDialog.getSaveFileName(
-                self, "Export to Excel", f"{default_name}.xlsx",
-                "Excel Files (*.xlsx)")
-        elif format_type == 'csv':
-            file_path, _ = QFileDialog.getSaveFileName(
-                self, "Export to CSV", f"{default_name}.csv",
-                "CSV Files (*.csv)")
-        elif format_type == 'json':
-            file_path, _ = QFileDialog.getSaveFileName(
-                self, "Export to JSON", f"{default_name}.json",
-                "JSON Files (*.json)")
-        elif format_type == 'pdf':
-            file_path, _ = QFileDialog.getSaveFileName(
-                self, "Export to PDF", f"{default_name}.pdf",
-                "PDF Files (*.pdf)")
-        else:
-            return
-        
-        if not file_path:
-            return
-        
         try:
-            # Show progress dialog
-            progress = QProgressDialog("Exporting results...", "Cancel", 0, 100, self)
-            progress.setWindowModality(Qt.WindowModal)
-            progress.show()
+            if not self.results_data:
+                QMessageBox.warning(self, "No Data", "No results available to export.")
+                return
+            
+            # Get file path
+            default_name = f"mcdm_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             
             if format_type == 'excel':
-                self.export_to_excel(file_path, progress)
+                file_path, _ = QFileDialog.getSaveFileName(
+                    self, "Export to Excel", f"{default_name}.xlsx",
+                    "Excel Files (*.xlsx)")
+                if file_path:
+                    self.export_to_excel(file_path)
+                    
             elif format_type == 'csv':
-                self.export_to_csv(file_path, progress)
+                file_path, _ = QFileDialog.getSaveFileName(
+                    self, "Export to CSV", f"{default_name}.csv",
+                    "CSV Files (*.csv)")
+                if file_path:
+                    self.export_to_csv(file_path)
+                    
             elif format_type == 'json':
-                self.export_to_json(file_path, progress)
+                file_path, _ = QFileDialog.getSaveFileName(
+                    self, "Export to JSON", f"{default_name}.json",
+                    "JSON Files (*.json)")
+                if file_path:
+                    self.export_to_json(file_path)
+                    
             elif format_type == 'pdf':
-                self.export_to_pdf(file_path, progress)
-            
-            progress.setValue(100)
-            QMessageBox.information(self, "Export Complete", 
-                                  f"Results exported successfully to:\n{file_path}")
+                file_path, _ = QFileDialog.getSaveFileName(
+                    self, "Export to PDF", f"{default_name}.pdf",
+                    "PDF Files (*.pdf)")
+                if file_path:
+                    self.export_to_pdf(file_path)
             
         except Exception as e:
-            logger.error(f"Export error: {e}")
-            QMessageBox.critical(self, "Export Error", f"Failed to export: {str(e)}")
+            logger.error(f"Error exporting results: {str(e)}")
+            QMessageBox.critical(self, "Export Error", f"Failed to export results: {str(e)}")
     
-    def export_to_excel(self, file_path: str, progress: QProgressDialog):
+    def export_to_excel(self, file_path: str):
         """Export results to Excel file"""
-        with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
-            # Summary sheet
-            summary_data = {
-                'Metric': ['Number of Methods', 'Number of Alternatives', 'Best Alternative'],
-                'Value': [
-                    len(self.results_data),
-                    len(next(iter(self.results_data.values())).get('alternatives', [])),
-                    self.best_alt_card.value_label.text()
-                ]
-            }
-            pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
-            progress.setValue(20)
-            
+        with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
             # Comparison sheet
             comparison_data = self.prepare_comparison_data()
-            pd.DataFrame(comparison_data).to_excel(writer, sheet_name='Comparison', index=False)
-            progress.setValue(50)
+            df_comparison = pd.DataFrame(comparison_data)
+            df_comparison.to_excel(writer, sheet_name='Comparison', index=False)
             
             # Individual method sheets
-            for i, (method_name, result) in enumerate(self.results_data.items()):
-                method_data = self.prepare_method_data(result)
-                pd.DataFrame(method_data).to_excel(writer, sheet_name=method_name, index=False)
-                progress.setValue(50 + (40 * (i + 1) / len(self.results_data)))
+            for method_name, result_data in self.results_data.items():
+                method_data = self.prepare_method_data(result_data)
+                df_method = pd.DataFrame(method_data)
+                sheet_name = method_name[:31]  # Excel sheet name limit
+                df_method.to_excel(writer, sheet_name=sheet_name, index=False)
+            
+            # Format the Excel file
+            workbook = writer.book
+            header_format = workbook.add_format({
+                'bold': True,
+                'bg_color': '#4CAF50',
+                'font_color': 'white',
+                'border': 1
+            })
+            
+            # Apply formatting to each sheet
+            for sheet_name in writer.sheets:
+                worksheet = writer.sheets[sheet_name]
+                worksheet.freeze_panes(1, 0)  # Freeze header row
+        
+        QMessageBox.information(self, "Export Complete", 
+                              f"Results exported successfully to:\n{file_path}")
     
-    def export_to_csv(self, file_path: str, progress: QProgressDialog):
+    def export_to_csv(self, file_path: str):
         """Export results to CSV file"""
         comparison_data = self.prepare_comparison_data()
         df = pd.DataFrame(comparison_data)
         df.to_csv(file_path, index=False)
-        progress.setValue(100)
+        
+        QMessageBox.information(self, "Export Complete", 
+                              f"Results exported successfully to:\n{file_path}")
     
-    def export_to_json(self, file_path: str, progress: QProgressDialog):
+    def export_to_json(self, file_path: str):
         """Export results to JSON file"""
+        export_data = {
+            'project_id': self.project_controller.current_project_id,
+            'export_timestamp': datetime.now().isoformat(),
+            'methods': self.results_data,
+            'summary': {
+                'methods_count': len(self.results_data),
+                'best_alternatives': self.get_best_alternatives_summary()
+            }
+        }
+        
         with open(file_path, 'w') as f:
-            json.dump(self.results_data, f, indent=2)
-        progress.setValue(100)
+            json.dump(export_data, f, indent=2)
+        
+        QMessageBox.information(self, "Export Complete", 
+                              f"Results exported successfully to:\n{file_path}")
     
-    def export_to_pdf(self, file_path: str, progress: QProgressDialog):
+    def export_to_pdf(self, file_path: str):
         """Export results to PDF report"""
-        # TODO: Implement PDF export with reportlab
-        progress.setValue(100)
-        QMessageBox.information(self, "PDF Export", "PDF export not yet implemented")
+        doc = SimpleDocTemplate(file_path, pagesize=letter)
+        story = []
+        styles = getSampleStyleSheet()
+        
+        # Title
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#2196F3'),
+            spaceAfter=30
+        )
+        story.append(Paragraph("MCDM Analysis Report", title_style))
+        story.append(Spacer(1, 20))
+        
+        # Project info
+        project_data = self.project_controller.get_project_data()
+        if project_data:
+            story.append(Paragraph(f"Project: {project_data.get('name', 'Unknown')}", styles['Heading2']))
+            story.append(Paragraph(f"Description: {project_data.get('description', 'N/A')}", styles['Normal']))
+            story.append(Spacer(1, 20))
+        
+        # Summary
+        story.append(Paragraph("Executive Summary", styles['Heading2']))
+        summary_data = [
+            ['Methods Executed', str(len(self.results_data))],
+            ['Best Alternative', self.best_alt_card.value_label.text()],
+            ['Consensus Level', self.consensus_card.value_label.text()],
+            ['Total Execution Time', self.exec_time_card.value_label.text()]
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[3*inch, 3*inch])
+        summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.white)
+        ]))
+        story.append(summary_table)
+        story.append(PageBreak())
+        
+        # Results comparison
+        story.append(Paragraph("Results Comparison", styles['Heading2']))
+        comparison_data = self.prepare_comparison_data()
+        
+        # Create table data
+        table_data = [list(comparison_data.keys())]  # Headers
+        for i in range(len(comparison_data['Alternative'])):
+            row = [comparison_data[key][i] for key in comparison_data.keys()]
+            table_data.append(row)
+        
+        results_table = Table(table_data)
+        results_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(results_table)
+        
+        # Build PDF
+        doc.build(story)
+        
+        QMessageBox.information(self, "Export Complete", 
+                              f"PDF report exported successfully to:\n{file_path}")
     
     def prepare_comparison_data(self) -> Dict[str, List]:
         """Prepare comparison data for export"""
@@ -1270,11 +1468,53 @@ class ResultsTab(QWidget):
         
         return data
     
+    def get_best_alternatives_summary(self) -> List[Dict]:
+        """Get summary of best alternatives from each method"""
+        summary = []
+        
+        for method_name, result_data in self.results_data.items():
+            alts = result_data.get('alternatives', [])
+            if alts:
+                sorted_alts = sorted(alts, key=lambda x: x.get('ranking', 999))
+                if sorted_alts:
+                    best_alt = sorted_alts[0]
+                    summary.append({
+                        'method': method_name,
+                        'best_alternative': best_alt.get('name', 'Unknown'),
+                        'score': best_alt.get('score', 0)
+                    })
+        
+        return summary
+    
     def print_results(self):
         """Print results"""
-        # TODO: Implement printing functionality
-        QMessageBox.information(self, "Print", "Print functionality not yet implemented")
+        try:
+            # Create a temporary PDF
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
+                self.export_to_pdf(tmp_file.name)
+                
+                # Open the PDF for printing
+                import subprocess
+                import platform
+                
+                if platform.system() == 'Windows':
+                    subprocess.run(['start', '/print', tmp_file.name], shell=True)
+                elif platform.system() == 'Darwin':  # macOS
+                    subprocess.run(['lpr', tmp_file.name])
+                else:  # Linux
+                    subprocess.run(['lpr', tmp_file.name])
+                    
+        except Exception as e:
+            logger.error(f"Error printing results: {str(e)}")
+            QMessageBox.critical(self, "Print Error", f"Failed to print results: {str(e)}")
     
     def refresh_on_tab_change(self):
         """Refresh when tab is selected"""
         self.load_results()
+    
+    def update_with_results(self, results_data: Dict[str, Dict]):
+        """Update the tab with new results data"""
+        self.results_data = results_data
+        self.update_display()
+        self.status_label.setText(f"Displaying {len(results_data)} results")

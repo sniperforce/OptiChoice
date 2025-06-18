@@ -277,7 +277,7 @@ class MCDMApplication(QMainWindow):
         # Switch to results tab
         self.tab_widget.setCurrentIndex(3)
         
-        # TODO: Update results tab with the results
+        self.results_tab.update_with_results(results)
         self.statusBar.showMessage(f"Executed {len(results)} methods successfully")
 
     # Actualizar el método execute_method en los menús
