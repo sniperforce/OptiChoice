@@ -6,6 +6,9 @@ from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QIcon, QFont
 from controllers.project_controller import ProjectController
 from PyQt5.QtWidgets import QFileDialog, QInputDialog
+import logging
+
+logger = logging.getLogger(__name__)
 
 class MCDMApplication(QMainWindow):
     """Main window for the MCDM (Multi-Criteria Decision Making) application"""
@@ -220,6 +223,7 @@ class MCDMApplication(QMainWindow):
         from views.tabs.problem_tab import ProblemTab
         from views.tabs.matrix_tab import MatrixTab 
         from views.tabs.method_tab import MethodTab
+        from views.tabs.results_tab import ResultsTab
 
         self.project_controller = ProjectController()
 
@@ -241,7 +245,7 @@ class MCDMApplication(QMainWindow):
     
 
         # Results tab
-        self.results_tab = QWidget()
+        self.results_tab = ResultsTab(self.project_controller)
         self.tab_widget.addTab(self.results_tab, "Results")
         
         # Visualization tab
@@ -257,9 +261,12 @@ class MCDMApplication(QMainWindow):
         if index == 1:  # Decision Matrix tab
             if hasattr(self, 'matrix_tab'):
                 self.matrix_tab.load_matrix_data()
-        elif index == 2:  # Method Selection tab - AÑADIDO
+        elif index == 2:  # Method Selection tab
             if hasattr(self, 'method_tab'):
                 self.method_tab.refresh_on_tab_change()
+        elif index == 3:  # Results tab - AÑADIR ESTO
+            if hasattr(self, 'results_tab'):
+                self.results_tab.refresh_on_tab_change()
         
         # Actualizar status bar según la pestaña
         tab_names = ["Project Manager", "Decision Matrix", "Method Selection", "Results", "Visualization", "Sensitivity Analysis"]
@@ -274,33 +281,56 @@ class MCDMApplication(QMainWindow):
 
     def on_methods_executed(self, results):
         """Handle methods execution completion"""
-        # Switch to results tab
-        self.tab_widget.setCurrentIndex(3)
-        
-        self.results_tab.update_with_results(results)
-        self.statusBar.showMessage(f"Executed {len(results)} methods successfully")
+        try:
+            # Switch to results tab
+            self.tab_widget.setCurrentIndex(3)
+            
+            # Verificar que results_tab existe y tiene el método correcto
+            if hasattr(self, 'results_tab') and hasattr(self.results_tab, 'update_with_results'):
+                self.results_tab.update_with_results(results)
+                self.statusBar.showMessage(f"Executed {len(results)} methods successfully")
+            else:
+                logger.error("Results tab not properly initialized")
+                QMessageBox.critical(self, "Error", "Results tab is not properly initialized")
+                
+        except Exception as e:
+            logger.error(f"Error updating results: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Failed to display results: {str(e)}")
+            self.statusBar.showMessage("Error displaying results")
 
     # Actualizar el método execute_method en los menús
     def execute_method(self, method_name):
         """Execute a specific method from menu"""
-        self.statusBar.showMessage(f"Executing {method_name} method...")
-        
-        # Switch to method tab
-        self.tab_widget.setCurrentIndex(2)
-        
-        # Execute the method
-        if hasattr(self, 'method_tab'):
-            # Select and execute the specific method
-            if method_name in self.method_tab.method_cards:
-                card = self.method_tab.method_cards[method_name]
-                card.select_cb.setChecked(True)
-                self.method_tab.execute_single_method(method_name)
+        try:
+            self.statusBar.showMessage(f"Executing {method_name} method...")
+            
+            # Switch to method tab
+            self.tab_widget.setCurrentIndex(2)
+            
+            # Execute the method
+            if hasattr(self, 'method_tab'):
+                # Select and execute the specific method
+                if method_name in self.method_tab.method_cards:
+                    card = self.method_tab.method_cards[method_name]
+                    card.select_cb.setChecked(True)
+                    self.method_tab.execute_single_method(method_name)
+            else:
+                QMessageBox.warning(self, "Warning", "Method tab not initialized")
+                
+        except Exception as e:
+            logger.error(f"Error executing method {method_name}: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Failed to execute {method_name}: {str(e)}")
+            self.statusBar.showMessage("Error executing method")
 
     def project_changed(self):
         """Call this method whenever the project changes"""
-        # Actualizar todas las pestañas que dependen del proyecto
         if hasattr(self, 'matrix_tab'):
             self.matrix_tab.load_matrix_data()
+        
+        if hasattr(self, 'results_tab'):
+            self.results_tab.results_data = {}
+            self.results_tab.update_display()
+            self.results_tab.status_label.setText("No results loaded")
 
     # File menu actions
     def new_project(self):

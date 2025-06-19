@@ -1,4 +1,8 @@
 from utils.api_client import ApiClient
+from typing import Dict, List, Optional, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ProjectController:
     def __init__(self):
@@ -43,6 +47,26 @@ class ProjectController:
         
         return self.api_client.update_project(self.current_project_id, data)
     
+    def save_project(self, project_data: Dict[str, Any]) -> bool:
+        """
+        Save project data to backend
+        
+        Args:
+            project_data: Complete project data including alternatives, criteria, matrix, and results
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            if not self.current_project_id:
+                return False
+            
+            # Update project via API
+            return self.api_client.update_project(self.current_project_id, project_data)
+            
+        except Exception as e:
+            logger.error(f"Error saving project: {str(e)}")
+
     def save_complete_project(self, alternatives=None, criteria=None):
         """Save the complete project with all data from UI"""
         if not self.current_project_id:
@@ -122,9 +146,61 @@ class ProjectController:
             return False
         return self.api_client.update_matrix_values(self.current_project_id, updates)
     
-    def get_available_methods(self):
-        """Get all available MCDM methods"""
-        return self.api_client.get_available_methods()
+    def get_available_methods(self) -> List[Dict[str, Any]]:
+        """
+        Get list of available MCDM methods
+        
+        Returns:
+            List of method information dictionaries
+        """
+        try:
+            # Try to get from API first
+            methods = self.api_client.get_available_methods()
+            if methods:
+                return methods
+        except Exception as e:
+            logger.warning(f"Could not get methods from API: {e}")
+        
+        # Return default methods if API fails
+        return [
+            {
+                'name': 'TOPSIS',
+                'full_name': 'Technique for Order of Preference by Similarity to Ideal Solution',
+                'description': 'TOPSIS is based on the concept that the chosen alternative should have the shortest geometric distance from the positive ideal solution and the longest geometric distance from the negative ideal solution.',
+                'default_parameters': {
+                    'normalization_method': 'minmax',
+                    'distance_metric': 'euclidean'
+                }
+            },
+            {
+                'name': 'AHP',
+                'full_name': 'Analytic Hierarchy Process',
+                'description': 'AHP is a structured technique for organizing and analyzing complex decisions, based on mathematics and psychology.',
+                'default_parameters': {
+                    'consistency_ratio_threshold': 0.1,
+                    'weight_calculation_method': 'eigenvector'
+                }
+            },
+            {
+                'name': 'PROMETHEE',
+                'full_name': 'Preference Ranking Organization Method for Enrichment of Evaluations',
+                'description': 'PROMETHEE is an outranking method based on pairwise comparisons and preference functions.',
+                'default_parameters': {
+                    'variant': 'II',
+                    'default_preference_function': 'usual'
+                }
+            },
+            {
+                'name': 'ELECTRE',
+                'full_name': 'Elimination and Choice Expressing Reality',
+                'description': 'ELECTRE is based on concordance and discordance indices to establish outranking relations.',
+                'default_parameters': {
+                    'variant': 'III',
+                    'concordance_threshold': 0.65,
+                    'discordance_threshold': 0.35
+                }
+            }
+        ]
 
     def execute_method(self, method_name, parameters=None):
         """Execute a specific MCDM method on current project"""

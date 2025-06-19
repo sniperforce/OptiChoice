@@ -14,9 +14,12 @@ import json
 import time
 from datetime import datetime
 import logging
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
+# Reemplazar la clase MethodExecutor completa en frontend/views/tabs/method_tab.py
 
 class MethodExecutor(QThread):
     """Thread for executing MCDM methods asynchronously"""
@@ -38,7 +41,7 @@ class MethodExecutor(QThread):
     def setup(self, methods: List[str], parameters: Dict[str, Dict]):
         """Setup methods and parameters for execution"""
         self.methods_to_execute = methods
-        self.parameters = parameters
+        self.parameters = parameters or {}
         self._is_cancelled = False
     
     def cancel(self):
@@ -58,15 +61,50 @@ class MethodExecutor(QThread):
                 self.status_updated.emit(method_name, "Preparing...")
                 self.progress_updated.emit(method_name, 10)
                 
-                # Simulate preparation
-                time.sleep(0.2)
+                # Small delay to show status
+                time.sleep(0.1)
+                
+                # Get parameters for this method
+                params = self.parameters.get(method_name, {})
                 
                 # Execute method
                 self.status_updated.emit(method_name, "Executing...")
                 self.progress_updated.emit(method_name, 50)
                 
-                params = self.parameters.get(method_name, {})
+                # Start timing
+                start_time = time.time()
+                
+                # Call the controller method (IT ALREADY EXISTS!)
                 result = self.project_controller.execute_method(method_name, params)
+                
+                # Calculate execution time
+                execution_time = time.time() - start_time
+                
+                # Process the result
+                if result:
+                    # Ensure result has proper structure
+                    if isinstance(result, dict):
+                        # Add execution time if not present
+                        if 'execution_time' not in result:
+                            result['execution_time'] = execution_time
+                        
+                        # Add timestamp if not present
+                        if 'timestamp' not in result:
+                            result['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        
+                        # Ensure alternatives list exists
+                        if 'alternatives' not in result:
+                            result['alternatives'] = []
+                        
+                        # Ensure method name is included
+                        if 'method_name' not in result:
+                            result['method_name'] = method_name
+                    else:
+                        # Invalid result format
+                        raise ValueError(f"Invalid result format from {method_name}")
+                else:
+                    # No result returned
+                    raise ValueError(f"No result returned from {method_name}")
                 
                 self.progress_updated.emit(method_name, 90)
                 
@@ -81,13 +119,77 @@ class MethodExecutor(QThread):
                 self.method_completed.emit(method_name, result)
                 
             except Exception as e:
-                logger.error(f"Error executing {method_name}: {e}")
-                self.method_failed.emit(method_name, str(e))
+                error_msg = str(e)
+                logger.error(f"Error executing {method_name}: {error_msg}")
+                logger.exception(e)  # Log full traceback
+                
+                self.method_failed.emit(method_name, error_msg)
                 self.progress_updated.emit(method_name, 0)
-                self.status_updated.emit(method_name, f"Failed: {str(e)}")
+                self.status_updated.emit(method_name, f"Failed: {error_msg}")
+                
+                # Add failed result
+                results[method_name] = {
+                    'method_name': method_name,
+                    'alternatives': [],
+                    'execution_time': 0,
+                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'error': error_msg,
+                    'status': 'failed'
+                }
         
-        if not self._is_cancelled:
+        # Emit all results even if some failed
+        if not self._is_cancelled and results:
             self.all_completed.emit(results)
+    
+    def create_mock_result(self, method_name: str) -> Dict[str, Any]:
+        """Create a mock result for testing when actual method execution fails"""
+        try:
+            # Get project data
+            project = self.project_controller.get_current_project()
+            if not project:
+                raise ValueError("No current project")
+            
+            # Get alternatives
+            alternatives = project.get('alternatives', [])
+            
+            # Create mock scores and rankings
+            mock_alternatives = []
+            scores = np.random.rand(len(alternatives))
+            rankings = np.argsort(-scores) + 1  # Higher score = better rank
+            
+            for i, alt in enumerate(alternatives):
+                mock_alternatives.append({
+                    'id': alt.get('id', f'A{i+1}'),
+                    'name': alt.get('name', f'Alternative {i+1}'),
+                    'score': float(scores[i]),
+                    'ranking': int(rankings[i])
+                })
+            
+            # Sort by ranking
+            mock_alternatives.sort(key=lambda x: x['ranking'])
+            
+            return {
+                'method_name': method_name,
+                'alternatives': mock_alternatives,
+                'execution_time': np.random.uniform(0.1, 0.5),
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'parameters': self.parameters.get(method_name, {}),
+                'status': 'completed',
+                'metadata': {
+                    'note': 'Mock result for testing'
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error creating mock result: {e}")
+            return {
+                'method_name': method_name,
+                'alternatives': [],
+                'execution_time': 0,
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'error': str(e),
+                'status': 'failed'
+            }
 
 
 class MethodConfigWidget(QWidget):
@@ -463,6 +565,7 @@ class MethodTab(QWidget):
         self.method_cards = {}
         self.method_configs = {}
         self.method_results = {}
+        self.current_config_widget = None
         self.executor = MethodExecutor(project_controller)
         
         self.init_ui()
@@ -759,24 +862,30 @@ class MethodTab(QWidget):
     
     def configure_method(self, method_name: str):
         """Configure method parameters"""
-        # Clear previous configuration
-        while self.config_layout.count() > 1:  # Keep instructions
-            child = self.config_layout.takeAt(1)
-            if child.widget():
-                child.widget().deleteLater()
+        # Clear previous configuration widget but keep the reference
+        # Remove old widget from layout but not from dictionary
+        if hasattr(self, 'current_config_widget') and self.current_config_widget:
+            self.config_layout.removeWidget(self.current_config_widget)
+            self.current_config_widget.setParent(None)
         
         # Get method info
         method_info = next((card.method_info for card in self.method_cards.values() 
-                          if card.method_name == method_name), None)
+                        if card.method_name == method_name), None)
         
         if not method_info:
             return
         
-        # Create configuration widget
-        config_widget = MethodConfigWidget(method_info)
-        self.method_configs[method_name] = config_widget
+        # Create or reuse configuration widget
+        if method_name not in self.method_configs:
+            config_widget = MethodConfigWidget(method_info)
+            self.method_configs[method_name] = config_widget
+        else:
+            config_widget = self.method_configs[method_name]
         
-        # Add to layout
+        # Store reference to current widget
+        self.current_config_widget = config_widget
+        
+        # Add to layout (after instructions)
         self.config_layout.insertWidget(1, config_widget)
         
         # Switch to configuration tab
@@ -854,7 +963,22 @@ class MethodTab(QWidget):
                 
                 # Get parameters if configured
                 if method_name in self.method_configs:
-                    parameters[method_name] = self.method_configs[method_name].get_parameters()
+                    try:
+                        # Check if widget still exists
+                        config_widget = self.method_configs[method_name]
+                        if config_widget and not config_widget.isVisible():
+                            # Widget exists but not visible, it's ok
+                            parameters[method_name] = config_widget.get_parameters()
+                        elif config_widget:
+                            # Widget is visible, get parameters
+                            parameters[method_name] = config_widget.get_parameters()
+                        else:
+                            # Widget was deleted, use defaults
+                            parameters[method_name] = {}
+                    except RuntimeError:
+                        # Widget was deleted, use default parameters
+                        logger.warning(f"Config widget for {method_name} was deleted, using defaults")
+                        parameters[method_name] = {}
         
         if not selected_methods:
             QMessageBox.warning(self, "No Selection", "Please select at least one method to execute.")
@@ -862,8 +986,8 @@ class MethodTab(QWidget):
         
         # Confirm execution
         reply = QMessageBox.question(self, "Confirm Execution",
-                                   f"Execute {len(selected_methods)} selected method(s)?",
-                                   QMessageBox.Yes | QMessageBox.No)
+                                f"Execute {len(selected_methods)} selected method(s)?",
+                                QMessageBox.Yes | QMessageBox.No)
         
         if reply == QMessageBox.Yes:
             self.set_execution_state(True)
@@ -955,15 +1079,17 @@ class MethodTab(QWidget):
         """Handle all methods completion"""
         self.set_execution_state(False)
         
-        # Switch to results tab
-        self.right_tabs.setCurrentIndex(1)
+        # IMPORTANTE: Emitir la señal para actualizar la pestaña de resultados
+        if results:
+            self.methods_executed.emit(results)
         
         # Show summary
         QMessageBox.information(self, "Execution Complete",
-                              f"Successfully executed {len(results)} method(s)!")
+                            f"Successfully executed {len(results)} method(s)!")
         
-        # Emit signal for other tabs
-        self.methods_executed.emit(results)
+        # Update the comparison if we have multiple results
+        if len(results) > 1:
+            self.update_comparison()
     
     def on_select_all_changed(self, state):
         """Handle select all checkbox"""
@@ -1014,11 +1140,11 @@ class MethodTab(QWidget):
         self.comparison_table.resizeColumnsToContents()
     
     def refresh_on_tab_change(self):
-        """Refresh status when tab is selected"""
+        """Refresh when tab is selected"""
+        # Check matrix status
         self.check_matrix_status()
         
-        # Clear results if project changed
-        if not self.project_controller.current_project_id:
-            self.results_table.setRowCount(0)
-            self.comparison_table.clear()
-            self.method_results.clear()
+        # Update method cards status
+        for card in self.method_cards.values():
+            card.set_status("Ready")
+            card.set_progress(0)

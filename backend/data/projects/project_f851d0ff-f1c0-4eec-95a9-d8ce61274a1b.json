@@ -1,0 +1,891 @@
+{
+  "id": "f851d0ff-f1c0-4eec-95a9-d8ce61274a1b",
+  "name": "TechCorp Solutions",
+  "description": "Selection of cloud service provider for TechCorp Solutions infrastructure migration",
+  "decision_maker": "Juan Perez (CTO)",
+  "created_at": "2025-06-18T22:37:50.890360",
+  "updated_at": "2025-06-19T19:47:10.769011",
+  "alternatives": [
+    {
+      "id": "A1",
+      "name": "Amazon Web Services (AWS)",
+      "description": "Market leader with the widest range of services",
+      "metadata": {}
+    },
+    {
+      "id": "A2",
+      "name": "Microsoft Azure",
+      "description": "Strong integration with Microsoft Products",
+      "metadata": {}
+    },
+    {
+      "id": "A3",
+      "name": "Google Cloud Plataform",
+      "description": "Excellent in AI/ML and data analytics",
+      "metadata": {}
+    },
+    {
+      "id": "A4",
+      "name": "IBM Cloud",
+      "description": "Enterprise focus with strong security",
+      "metadata": {}
+    },
+    {
+      "id": "A5",
+      "name": "Oracle Cloud",
+      "description": "Optimized for databases and enterprise",
+      "metadata": {}
+    }
+  ],
+  "criteria": [
+    {
+      "id": "C1",
+      "name": "Monthly Cost",
+      "description": "",
+      "optimization_type": "minimize",
+      "scale_type": "quantitative",
+      "weight": 0.25,
+      "unit": "",
+      "metadata": {}
+    },
+    {
+      "id": "C2",
+      "name": "Performance",
+      "description": "",
+      "optimization_type": "maximize",
+      "scale_type": "quantitative",
+      "weight": 0.2,
+      "unit": "",
+      "metadata": {}
+    },
+    {
+      "id": "C3",
+      "name": "Availability",
+      "description": "",
+      "optimization_type": "maximize",
+      "scale_type": "quantitative",
+      "weight": 0.15,
+      "unit": "",
+      "metadata": {}
+    },
+    {
+      "id": "C4",
+      "name": "Technical Support",
+      "description": "",
+      "optimization_type": "maximize",
+      "scale_type": "quantitative",
+      "weight": 0.15,
+      "unit": "",
+      "metadata": {}
+    },
+    {
+      "id": "C5",
+      "name": "Available Services",
+      "description": "",
+      "optimization_type": "maximize",
+      "scale_type": "quantitative",
+      "weight": 0.1,
+      "unit": "",
+      "metadata": {}
+    },
+    {
+      "id": "C6",
+      "name": "Ease of Use",
+      "description": "",
+      "optimization_type": "maximize",
+      "scale_type": "quantitative",
+      "weight": 0.1,
+      "unit": "",
+      "metadata": {}
+    },
+    {
+      "id": "C7",
+      "name": "Security",
+      "description": "",
+      "optimization_type": "maximize",
+      "scale_type": "quantitative",
+      "weight": 0.05,
+      "unit": "",
+      "metadata": {}
+    }
+  ],
+  "metadata": {
+    "criteria_config": {
+      "C1": {
+        "scale_type": "Numeric (Continuous)",
+        "min_value": 0.0,
+        "max_value": 4300.0,
+        "unit": ""
+      },
+      "C2": {
+        "scale_type": "Numeric (Continuous)",
+        "min_value": 1.0,
+        "max_value": 100.0,
+        "unit": ""
+      },
+      "C3": {
+        "scale_type": "Numeric (Continuous)",
+        "min_value": 0.0,
+        "max_value": 100.0,
+        "unit": ""
+      },
+      "C4": {
+        "scale_type": "Numeric (Continuous)",
+        "min_value": 0.0,
+        "max_value": 100.0,
+        "unit": ""
+      },
+      "C5": {
+        "scale_type": "Numeric (Continuous)",
+        "min_value": 0.0,
+        "max_value": 100.0,
+        "unit": ""
+      },
+      "C6": {
+        "scale_type": "Numeric (Continuous)",
+        "min_value": 0.0,
+        "max_value": 100.0,
+        "unit": ""
+      },
+      "C7": {
+        "scale_type": "Numeric (Continuous)",
+        "min_value": 0.0,
+        "max_value": 100.0,
+        "unit": ""
+      }
+    }
+  },
+  "results": {
+    "TOPSIS": {
+      "method_name": "TOPSIS",
+      "alternative_ids": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5"
+      ],
+      "alternative_names": [
+        "Amazon Web Services (AWS)",
+        "Microsoft Azure",
+        "Google Cloud Plataform",
+        "IBM Cloud",
+        "Oracle Cloud"
+      ],
+      "scores": [
+        0.59737289204014,
+        0.478099170952996,
+        0.386465655090487,
+        0.5712819516517358,
+        0.42749565445038556
+      ],
+      "rankings": [
+        1,
+        3,
+        5,
+        2,
+        4
+      ],
+      "execution_time": 0.0,
+      "parameters": {
+        "normalization_method": "vector",
+        "normalize_matrix": true,
+        "distance_metric": "euclidean",
+        "apply_weights_after_normalization": true,
+        "consider_criteria_type": true
+      },
+      "created_at": "2025-06-19T10:14:55.391992",
+      "metadata": {
+        "normalized_values": [
+          [
+            -0.4430379746835443,
+            0.5,
+            0.447446264498235,
+            0.4565841164282797,
+            0.5504818825631803,
+            0.4291975376394761,
+            0.45573271518765
+          ],
+          [
+            -0.4050632911392405,
+            0.4444444444444444,
+            0.4472672680927952,
+            0.5136571309818146,
+            0.4954336943068623,
+            0.49051147158797265,
+            0.45573271518765
+          ],
+          [
+            -0.35443037974683544,
+            0.5,
+            0.4472672680927952,
+            0.3995111018747447,
+            0.4403855060505443,
+            0.5518254055364693,
+            0.40509574683346666
+          ],
+          [
+            -0.5316455696202531,
+            0.3888888888888889,
+            0.4470435225859954,
+            0.4565841164282797,
+            0.3853373177942262,
+            0.3678836036909795,
+            0.5063696835418333
+          ],
+          [
+            -0.4810126582278481,
+            0.3888888888888889,
+            0.4470435225859954,
+            0.3995111018747447,
+            0.3302891295379082,
+            0.3678836036909795,
+            0.40509574683346666
+          ]
+        ],
+        "weighted_values": [
+          [
+            -0.11075949367088607,
+            0.1,
+            0.06711693967473524,
+            0.06848761746424195,
+            0.055048188256318034,
+            0.04291975376394761,
+            0.0227866357593825
+          ],
+          [
+            -0.10126582278481013,
+            0.08888888888888889,
+            0.06709009021391928,
+            0.07704856964727219,
+            0.049543369430686234,
+            0.04905114715879727,
+            0.0227866357593825
+          ],
+          [
+            -0.08860759493670886,
+            0.1,
+            0.06709009021391928,
+            0.059926665281211704,
+            0.04403855060505443,
+            0.055182540553646936,
+            0.020254787341673335
+          ],
+          [
+            -0.13291139240506328,
+            0.07777777777777778,
+            0.0670565283878993,
+            0.06848761746424195,
+            0.038533731779422625,
+            0.03678836036909795,
+            0.025318484177091666
+          ],
+          [
+            -0.12025316455696203,
+            0.07777777777777778,
+            0.0670565283878993,
+            0.059926665281211704,
+            0.03302891295379082,
+            0.03678836036909795,
+            0.020254787341673335
+          ]
+        ],
+        "ideal_positive": [
+          -0.13291139240506328,
+          0.1,
+          0.06711693967473524,
+          0.07704856964727219,
+          0.055048188256318034,
+          0.055182540553646936,
+          0.025318484177091666
+        ],
+        "ideal_negative": [
+          -0.08860759493670886,
+          0.07777777777777778,
+          0.0670565283878993,
+          0.059926665281211704,
+          0.03302891295379082,
+          0.03678836036909795,
+          0.020254787341673335
+        ],
+        "distances_positive": [
+          0.026847396821093338,
+          0.03462956625894966,
+          0.04901877137367053,
+          0.0343248284727901,
+          0.042379907108717654
+        ],
+        "distances_negative": [
+          0.03983315272543619,
+          0.03172320486460572,
+          0.030876953748123683,
+          0.04573904708606371,
+          0.03164556962025317
+        ],
+        "execution_time": 0.0006964206695556641
+      }
+    },
+    "ELECTRE": {
+      "method_name": "ELECTRE-I",
+      "alternative_ids": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5"
+      ],
+      "alternative_names": [
+        "Amazon Web Services (AWS)",
+        "Microsoft Azure",
+        "Google Cloud Plataform",
+        "IBM Cloud",
+        "Oracle Cloud"
+      ],
+      "scores": [
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        -1.0
+      ],
+      "rankings": [
+        1,
+        1,
+        1,
+        1,
+        5
+      ],
+      "execution_time": 0.0,
+      "parameters": {
+        "variant": "I",
+        "concordance_threshold": 0.7,
+        "discordance_threshold": 0.3,
+        "normalization_method": "minimax",
+        "normalize_matrix": true,
+        "preference_threshold": null,
+        "indifference_threshold": null,
+        "veto_thresholds": null,
+        "scoring_method": "net_flow",
+        "dominance_weight": 0.6
+      },
+      "created_at": "2025-06-19T19:47:08.509652",
+      "metadata": {
+        "outranking_matrix": [
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "dominance_matrix": [
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "non_dominated_alternatives": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "execution_time": 0.001283884048461914
+      }
+    },
+    "PROMETHEE": {
+      "method_name": "PROMETHEE-II",
+      "alternative_ids": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5"
+      ],
+      "alternative_names": [
+        "Amazon Web Services (AWS)",
+        "Microsoft Azure",
+        "Google Cloud Plataform",
+        "IBM Cloud",
+        "Oracle Cloud"
+      ],
+      "scores": [
+        0.44999999999999996,
+        0.175,
+        -0.11249999999999999,
+        -0.04999999999999993,
+        -0.4624999999999999
+      ],
+      "rankings": [
+        1,
+        2,
+        4,
+        3,
+        5
+      ],
+      "execution_time": 0.0,
+      "parameters": {
+        "variant": "II",
+        "default_preference_function": "v-shape",
+        "preference_functions": null,
+        "p_thresholds": null,
+        "q_thresholds": null,
+        "s_thresholds": null,
+        "normalization_method": "minimax",
+        "normalize_matrix": true
+      },
+      "created_at": "2025-06-19T19:47:10.768974",
+      "metadata": {
+        "positive_flow": [
+          0.6749999999999999,
+          0.5625,
+          0.375,
+          0.4,
+          0.1875
+        ],
+        "negative_flow": [
+          0.22499999999999998,
+          0.3875,
+          0.4875,
+          0.44999999999999996,
+          0.6499999999999999
+        ],
+        "net_flow": [
+          0.44999999999999996,
+          0.175,
+          -0.11249999999999999,
+          -0.04999999999999993,
+          -0.4624999999999999
+        ],
+        "preference_matrix": [
+          [
+            0.0,
+            0.7,
+            0.7000000000000001,
+            0.5499999999999999,
+            0.75
+          ],
+          [
+            0.25,
+            0.0,
+            0.55,
+            0.7,
+            0.75
+          ],
+          [
+            0.1,
+            0.30000000000000004,
+            0.0,
+            0.5499999999999999,
+            0.5499999999999999
+          ],
+          [
+            0.3,
+            0.3,
+            0.45,
+            0.0,
+            0.55
+          ],
+          [
+            0.25,
+            0.25,
+            0.25,
+            0.0,
+            0.0
+          ]
+        ],
+        "execution_time": 0.0005056858062744141
+      }
+    },
+    "AHP": {
+      "method_name": "AHP",
+      "alternative_ids": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5"
+      ],
+      "alternative_names": [
+        "Amazon Web Services (AWS)",
+        "Microsoft Azure",
+        "Google Cloud Plataform",
+        "IBM Cloud",
+        "Oracle Cloud"
+      ],
+      "scores": [
+        0.20000000000000007,
+        0.19999999999999998,
+        0.20000000000000007,
+        0.20000000000000007,
+        0.20000000000000007
+      ],
+      "rankings": [
+        1,
+        5,
+        1,
+        1,
+        1
+      ],
+      "execution_time": 0.0,
+      "parameters": {
+        "criteria_comparison_matrix": null,
+        "alternatives_comparison_matrices": null,
+        "consistency_ratio_threshold": 0.1,
+        "weight_calculation_method": "eigenvector",
+        "use_pairwise_comparison_for_alternatives": true,
+        "show_consistency_details": true,
+        "normalize_before_comparison": true,
+        "normalization_method": "minimax"
+      },
+      "created_at": "2025-06-19T19:47:06.233668",
+      "metadata": {
+        "criteria_weights": [
+          0.25,
+          0.2,
+          0.15,
+          0.15,
+          0.1,
+          0.1,
+          0.05
+        ],
+        "alternative_priorities": [
+          [
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004
+          ],
+          [
+            0.19999999999999998,
+            0.19999999999999998,
+            0.19999999999999998,
+            0.19999999999999998,
+            0.19999999999999998,
+            0.19999999999999998,
+            0.19999999999999998
+          ],
+          [
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004
+          ],
+          [
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004
+          ],
+          [
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004,
+            0.20000000000000004
+          ]
+        ],
+        "consistency_info": {
+          "criteria_consistency": {
+            "consistency_index": 0.0,
+            "consistency_ratio": 0.0,
+            "is_consistent": true,
+            "max_eigenvalue": 7,
+            "method": "weights_derived"
+          },
+          "alternatives_consistency": [
+            {
+              "criterion_name": "Monthly Cost",
+              "criterion_id": "C1",
+              "consistency_index": -2.220446049250313e-16,
+              "consistency_ratio": -1.982541115402065e-16,
+              "is_consistent": true,
+              "max_eigenvalue": 4.999999999999999,
+              "method": "eigenvector"
+            },
+            {
+              "criterion_name": "Performance",
+              "criterion_id": "C2",
+              "consistency_index": -2.220446049250313e-16,
+              "consistency_ratio": -1.982541115402065e-16,
+              "is_consistent": true,
+              "max_eigenvalue": 4.999999999999999,
+              "method": "eigenvector"
+            },
+            {
+              "criterion_name": "Availability",
+              "criterion_id": "C3",
+              "consistency_index": -2.220446049250313e-16,
+              "consistency_ratio": -1.982541115402065e-16,
+              "is_consistent": true,
+              "max_eigenvalue": 4.999999999999999,
+              "method": "eigenvector"
+            },
+            {
+              "criterion_name": "Technical Support",
+              "criterion_id": "C4",
+              "consistency_index": -2.220446049250313e-16,
+              "consistency_ratio": -1.982541115402065e-16,
+              "is_consistent": true,
+              "max_eigenvalue": 4.999999999999999,
+              "method": "eigenvector"
+            },
+            {
+              "criterion_name": "Available Services",
+              "criterion_id": "C5",
+              "consistency_index": -2.220446049250313e-16,
+              "consistency_ratio": -1.982541115402065e-16,
+              "is_consistent": true,
+              "max_eigenvalue": 4.999999999999999,
+              "method": "eigenvector"
+            },
+            {
+              "criterion_name": "Ease of Use",
+              "criterion_id": "C6",
+              "consistency_index": -2.220446049250313e-16,
+              "consistency_ratio": -1.982541115402065e-16,
+              "is_consistent": true,
+              "max_eigenvalue": 4.999999999999999,
+              "method": "eigenvector"
+            },
+            {
+              "criterion_name": "Security",
+              "criterion_id": "C7",
+              "consistency_index": -2.220446049250313e-16,
+              "consistency_ratio": -1.982541115402065e-16,
+              "is_consistent": true,
+              "max_eigenvalue": 4.999999999999999,
+              "method": "eigenvector"
+            }
+          ]
+        },
+        "execution_time": 0.16250967979431152
+      }
+    }
+  },
+  "decision_matrix": {
+    "name": "Matriz de TechCorp Solutions",
+    "alternatives": [
+      {
+        "id": "A1",
+        "name": "Amazon Web Services (AWS)",
+        "description": "Market leader with the widest range of services",
+        "metadata": {}
+      },
+      {
+        "id": "A2",
+        "name": "Microsoft Azure",
+        "description": "Strong integration with Microsoft Products",
+        "metadata": {}
+      },
+      {
+        "id": "A3",
+        "name": "Google Cloud Plataform",
+        "description": "Excellent in AI/ML and data analytics",
+        "metadata": {}
+      },
+      {
+        "id": "A4",
+        "name": "IBM Cloud",
+        "description": "Enterprise focus with strong security",
+        "metadata": {}
+      },
+      {
+        "id": "A5",
+        "name": "Oracle Cloud",
+        "description": "Optimized for databases and enterprise",
+        "metadata": {}
+      }
+    ],
+    "criteria": [
+      {
+        "id": "C1",
+        "name": "Monthly Cost",
+        "description": "",
+        "optimization_type": "minimize",
+        "scale_type": "quantitative",
+        "weight": 0.25,
+        "unit": "",
+        "metadata": {}
+      },
+      {
+        "id": "C2",
+        "name": "Performance",
+        "description": "",
+        "optimization_type": "maximize",
+        "scale_type": "quantitative",
+        "weight": 0.2,
+        "unit": "",
+        "metadata": {}
+      },
+      {
+        "id": "C3",
+        "name": "Availability",
+        "description": "",
+        "optimization_type": "maximize",
+        "scale_type": "quantitative",
+        "weight": 0.15,
+        "unit": "",
+        "metadata": {}
+      },
+      {
+        "id": "C4",
+        "name": "Technical Support",
+        "description": "",
+        "optimization_type": "maximize",
+        "scale_type": "quantitative",
+        "weight": 0.15,
+        "unit": "",
+        "metadata": {}
+      },
+      {
+        "id": "C5",
+        "name": "Available Services",
+        "description": "",
+        "optimization_type": "maximize",
+        "scale_type": "quantitative",
+        "weight": 0.1,
+        "unit": "",
+        "metadata": {}
+      },
+      {
+        "id": "C6",
+        "name": "Ease of Use",
+        "description": "",
+        "optimization_type": "maximize",
+        "scale_type": "quantitative",
+        "weight": 0.1,
+        "unit": "",
+        "metadata": {}
+      },
+      {
+        "id": "C7",
+        "name": "Security",
+        "description": "",
+        "optimization_type": "maximize",
+        "scale_type": "quantitative",
+        "weight": 0.05,
+        "unit": "",
+        "metadata": {}
+      }
+    ],
+    "values": [
+      [
+        3500.0,
+        9.0,
+        99.99,
+        8.0,
+        10.0,
+        7.0,
+        9.0
+      ],
+      [
+        3200.0,
+        8.0,
+        99.95,
+        9.0,
+        9.0,
+        8.0,
+        9.0
+      ],
+      [
+        2800.0,
+        9.0,
+        99.95,
+        7.0,
+        8.0,
+        9.0,
+        8.0
+      ],
+      [
+        4200.0,
+        7.0,
+        99.9,
+        8.0,
+        7.0,
+        6.0,
+        10.0
+      ],
+      [
+        3800.0,
+        7.0,
+        99.9,
+        7.0,
+        6.0,
+        6.0,
+        8.0
+      ]
+    ]
+  }
+}
