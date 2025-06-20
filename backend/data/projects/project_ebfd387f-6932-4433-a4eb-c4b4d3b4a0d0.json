@@ -4,7 +4,7 @@
   "description": "mejores ventas",
   "decision_maker": "Diego",
   "created_at": "2025-06-18T10:34:17.162712",
-  "updated_at": "2025-06-20T01:44:14.483842",
+  "updated_at": "2025-06-20T06:57:41.083047",
   "alternatives": [
     {
       "id": "A1",
@@ -287,8 +287,8 @@
         5.0
       ],
       [
-        3.0,
-        4.0
+        4.0,
+        10.0
       ]
     ]
   }

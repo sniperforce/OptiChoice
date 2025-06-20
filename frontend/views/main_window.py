@@ -258,7 +258,7 @@ class MCDMApplication(QMainWindow):
         self.tab_widget.addTab(self.sensitivity_tab, "Sensitivity Analysis")
     
     def on_tab_changed(self, index):
-        """Handle tab changes to sync data - IMPROVED VERSION"""
+        """Handle tab changes to sync data - CORRECTED VERSION"""
         
         # CRÍTICO: Guardar matriz antes de cambiar si venimos de la pestaña de matriz
         if self.previous_tab_index == 1 and hasattr(self, 'matrix_tab'):
@@ -269,6 +269,8 @@ class MCDMApplication(QMainWindow):
                     self.matrix_tab.save_matrix(show_success=False)
                     # Esperar un momento para que se complete
                     QApplication.processEvents()
+                    import time
+                    time.sleep(0.1)  # Pequeña pausa para asegurar que se complete
                 except Exception as e:
                     logger.error(f"Error saving matrix on tab change: {e}")
         
@@ -280,10 +282,10 @@ class MCDMApplication(QMainWindow):
                 
         elif index == 2:  # Method Selection tab
             if hasattr(self, 'method_tab'):
-                # Forzar recarga del estado de la matriz
+                # CORRECCIÓN: Solo llamar check_matrix_status UNA vez
+                # Eliminar la llamada duplicada
                 self.method_tab.refresh_on_tab_change()
-                # Verificar estado inmediatamente
-                self.method_tab.check_matrix_status()
+                # NO llamar check_matrix_status() aquí porque refresh_on_tab_change ya lo hace
                 
         elif index == 3:  # Results tab
             if hasattr(self, 'results_tab'):

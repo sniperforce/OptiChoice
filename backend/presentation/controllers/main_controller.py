@@ -377,6 +377,10 @@ class MainController:
             
             matrix = self._current_project.decision_matrix
             
+            # Log para debug
+            print(f"Saving matrix with {len(matrix_data)} values")
+            print(f"Criteria config: {criteria_config}")
+            
             # Update matrix values from matrix_data
             for key, value in matrix_data.items():
                 if '_' in key and value.strip():
@@ -403,14 +407,28 @@ class MainController:
                         print(f"Error setting matrix value for {key}: {e}")
                         continue
             
-            # Save criteria configuration as metadata
+            # IMPORTANTE: Guardar la configuración de criterios como metadata
             if criteria_config:
-                self._current_project.set_metadata('criteria_config', criteria_config)
+                # Asegurar que los valores sean float
+                clean_config = {}
+                for crit_id, config in criteria_config.items():
+                    clean_config[crit_id] = {
+                        'scale_type': config.get('scale_type', 'Numeric (Continuous)'),
+                        'min_value': float(config.get('min_value', 0)),
+                        'max_value': float(config.get('max_value', 100)),
+                        'unit': config.get('unit', ''),
+                        'configured': config.get('configured', False)
+                    }
+                
+                self._current_project.set_metadata('criteria_config', clean_config)
+                print(f"Saved criteria config: {clean_config}")
             
             return True
             
         except Exception as e:
             print(f"Error saving decision matrix: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def get_available_methods(self) -> List[Dict[str, Any]]:

@@ -74,6 +74,22 @@ class ProjectController:
             criteria=criteria
         )
 
+    def save_current_project(self):
+        """Save current project immediately"""
+        if not self.current_project_id:
+            return False
+        
+        try:
+            # Obtener el proyecto actual del API
+            project_data = self.api_client.get_project(self.current_project_id)
+            if project_data:
+                # Guardar inmediatamente
+                return self.api_client.update_project(self.current_project_id, project_data)
+            return False
+        except Exception as e:
+            logger.error(f"Error saving current project: {e}")
+            return False
+
     def get_all_projects(self):
         """Get all projects"""
         return self.api_client.get_projects()

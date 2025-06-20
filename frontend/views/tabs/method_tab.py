@@ -1181,8 +1181,8 @@ class MethodTab(QWidget):
         self.comparison_table.resizeColumnsToContents()
     
     def refresh_on_tab_change(self):
-        """Refresh when tab is selected"""
-        # Check matrix status
+        """Refresh when tab is selected - CORRECTED"""
+        # Solo verificar el estado de la matriz una vez
         self.check_matrix_status()
         
         # Update method cards status

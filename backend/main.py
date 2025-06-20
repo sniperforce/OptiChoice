@@ -266,15 +266,28 @@ def get_decision_matrix(project_id):
     """Get the decision matrix for a project"""
     try:
         controller.load_project(project_id)
+        project = controller._current_project
+        
+        # Verificar si hay matriz
+        if project.decision_matrix is None:
+            # Devolver estructura vacía pero con configuración si existe
+            config = project.get_metadata('criteria_config', {})
+            return jsonify({
+                'matrix_data': {},
+                'criteria_config': config,
+                'alternatives': controller.get_all_alternatives(),
+                'criteria': controller.get_all_criteria()
+            }), 200
+        
+        # Si hay matriz, devolver datos completos
         matrix_data = controller.get_decision_matrix()
+        
+        # Asegurar que la configuración esté incluida
+        if 'criteria_config' not in matrix_data:
+            matrix_data['criteria_config'] = project.get_metadata('criteria_config', {})
+        
         return jsonify(matrix_data)
-    except ValueError as e:
-        # Matrix doesn't exist yet - return empty structure
-        return jsonify({
-            'matrix_data': {},
-            'criteria_config': {},
-            'message': str(e)
-        }), 200  # Not an error, just no matrix yet
+        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
