@@ -656,21 +656,17 @@ class ResultsTab(QWidget):
         self.export_json(file_path.replace('.pdf', '.json'))
 
     def load_results(self):
-        """Cargar y mostrar resultados de archivos guardados"""
+        """Cargar resultados guardados del proyecto actual"""
         try:
             if not self.project_controller.current_project_id:
                 self.status_label.setText("No project selected")
                 return
             
-            project = self.project_controller.get_current_project()
-            if not project:
-                self.status_label.setText("Failed to load project")
-                return
+            # Obtener resultados guardados del proyecto
+            saved_results = self.project_controller.get_method_results()
             
-            self.results_data = {}
-            
-            if 'method_results' in project:
-                self.results_data = project['method_results']
+            if saved_results:
+                self.results_data = saved_results
                 results_loaded = len(self.results_data)
                 
                 total_exec_time = sum(
@@ -692,7 +688,6 @@ class ResultsTab(QWidget):
                 
         except Exception as e:
             logger.error(f"Error loading results: {str(e)}")
-            QMessageBox.critical(self, "Error", f"Failed to load results: {str(e)}")
             self.status_label.setText("Error loading results")
     
     def clear_displays(self):
@@ -716,15 +711,16 @@ class ResultsTab(QWidget):
         self.method_tabs.clear()
     
     def update_with_results(self, results_data: Dict[str, Dict]):
-        """Actualizar con nuevos datos de resultados"""
+        """Actualizar con nuevos datos de resultados y PERSISTIR"""
         try:
             logger.info(f"Updating results tab with {len(results_data)} results")
             
+            # IMPORTANTE: Guardar en el proyecto inmediatamente
             if self.project_controller.current_project_id:
-                project = self.project_controller.get_current_project()
-                if project:
-                    project['method_results'] = results_data
-                    self.project_controller.save_project(project)
+                # Guardar los resultados en el proyecto
+                success = self.project_controller.save_method_results(results_data)
+                if not success:
+                    logger.warning("Failed to persist results to project")
             
             self.results_data = results_data
             
@@ -1087,10 +1083,10 @@ class ResultsTab(QWidget):
         self.charts_content_layout.addWidget(canvas)
     
     def export_results(self, format_type: str):
-        """Exportar resultados en el formato especificado"""
+        """Exportar resultados con mejor manejo de errores"""
         try:
             if not self.results_data:
-                QMessageBox.warning(self, "No Data", "No results available to export.")
+                QMessageBox.warning(self, "No Results", "No results to export")
                 return
             
             # Diálogo para seleccionar archivo
@@ -1134,10 +1130,25 @@ class ResultsTab(QWidget):
         QMessageBox.information(self, "Success", f"Results exported to {filename}")
     
     def export_to_json(self, filename: str):
-        """Exportar a JSON"""
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(self.results_data, f, indent=2, ensure_ascii=False)
-        QMessageBox.information(self, "Success", f"Results exported to {filename}")
+        """Exportar a JSON con formato mejorado"""
+        try:
+            export_data = {
+                'project_id': self.project_controller.current_project_id,
+                'export_date': datetime.now().isoformat(),
+                'results': self.results_data,
+                'summary': {
+                    'total_methods': len(self.results_data),
+                    'methods': list(self.results_data.keys())
+                }
+            }
+            
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(export_data, f, indent=2, ensure_ascii=False)
+            
+            QMessageBox.information(self, "Success", f"Results exported to {filename}")
+        except Exception as e:
+            logger.error(f"Error exporting to JSON: {str(e)}")
+            raise
     
     def result_to_dataframe(self, result: Dict) -> pd.DataFrame:
         """Convertir resultado a DataFrame"""
@@ -1194,4 +1205,9 @@ class ResultsTab(QWidget):
     
     def refresh_on_tab_change(self):
         """Refrescar cuando se selecciona la pestaña"""
-        self.load_results()
+        # Solo cargar si no hay resultados en memoria
+        if not self.results_data:
+            self.load_results()
+        else:
+            # Si ya hay resultados, solo actualizar la visualización
+            self.update_display()

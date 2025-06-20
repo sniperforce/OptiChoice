@@ -814,39 +814,67 @@ class MethodTab(QWidget):
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
                 return False
             
-            # Check if matrix exists
-            matrix_data = self.project_controller.get_decision_matrix()
-            if not matrix_data or not matrix_data.get('matrix_data'):
+            # Get complete matrix data
+            complete_data = self.project_controller.get_decision_matrix()
+            
+            if not complete_data:
                 self.matrix_status.setText("⚠️ No decision matrix")
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
                 return False
             
-            # Check completeness
-            total_cells = len(matrix_data.get('alternatives', [])) * len(matrix_data.get('criteria', []))
-            filled_cells = sum(1 for v in matrix_data.get('matrix_data', {}).values() if v.strip())
+            # Extraer componentes
+            matrix_data = complete_data.get('matrix_data', {})
+            alternatives = complete_data.get('alternatives', [])
+            criteria = complete_data.get('criteria', [])
             
-            if total_cells == 0:
-                self.matrix_status.setText("⚠️ Empty matrix")
+            # Verificar que hay alternativas y criterios
+            if not alternatives or not criteria:
+                self.matrix_status.setText("⚠️ No alternatives or criteria defined")
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
                 return False
             
+            # Calcular completitud correctamente
+            total_cells = len(alternatives) * len(criteria)
+            
+            if total_cells == 0:
+                self.matrix_status.setText("⚠️ Empty matrix structure")
+                self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
+                return False
+            
+            # Contar celdas llenas usando la estructura correcta de keys
+            filled_cells = 0
+            for alt in alternatives:
+                for crit in criteria:
+                    key = f"{alt['id']}_{crit['id']}"
+                    if key in matrix_data and matrix_data[key].strip():
+                        filled_cells += 1
+            
             completeness = (filled_cells / total_cells) * 100
+            
+            logger.info(f"Matrix check - Total cells: {total_cells}, Filled: {filled_cells}, Completeness: {completeness:.1f}%")
             
             if completeness < 100:
                 self.matrix_status.setText(f"⚠️ Matrix {completeness:.0f}% complete")
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
                 
-                reply = QMessageBox.question(self, "Incomplete Matrix",
-                                           f"Matrix is only {completeness:.0f}% complete. Continue anyway?",
-                                           QMessageBox.Yes | QMessageBox.No)
-                return reply == QMessageBox.Yes
+                # Solo preguntar si es menor a 50%
+                if completeness < 50:
+                    reply = QMessageBox.question(self, "Incomplete Matrix",
+                                            f"Matrix is only {completeness:.0f}% complete. Continue anyway?",
+                                            QMessageBox.Yes | QMessageBox.No)
+                    return reply == QMessageBox.Yes
+                else:
+                    # Si es más del 50%, permitir continuar sin preguntar
+                    return True
             else:
-                self.matrix_status.setText("✅ Matrix ready")
+                self.matrix_status.setText("✅ Matrix ready (100% complete)")
                 self.matrix_status.setStyleSheet("color: #4CAF50; font-weight: bold;")
                 return True
                 
         except Exception as e:
             logger.error(f"Error checking matrix status: {e}")
+            import traceback
+            traceback.print_exc()
             self.matrix_status.setText("❌ Error checking matrix")
             self.matrix_status.setStyleSheet("color: #f44336; font-weight: bold;")
             return False

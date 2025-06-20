@@ -43,29 +43,25 @@ class ProjectController:
         if description is not None:
             data['description'] = description
         if decision_maker is not None:
-            data["decision_maker"] = decision_maker
+            data['decision_maker'] = decision_maker
         
         return self.api_client.update_project(self.current_project_id, data)
     
-    def save_project(self, project_data: Dict[str, Any]) -> bool:
-        """
-        Save project data to backend
+    def save_project(self, project_data=None):
+        """Save project with optional data update"""
+        if not self.current_project_id:
+            return False
         
-        Args:
-            project_data: Complete project data including alternatives, criteria, matrix, and results
-            
-        Returns:
-            True if successful, False otherwise
-        """
         try:
-            if not self.current_project_id:
-                return False
-            
-            # Update project via API
-            return self.api_client.update_project(self.current_project_id, project_data)
-            
+            if project_data:
+                # Si se proporciona data específica, actualizar el proyecto completo
+                return self.api_client.update_project(self.current_project_id, project_data)
+            else:
+                # Solo guardar el proyecto actual
+                return self.api_client.save_project(self.current_project_id)
         except Exception as e:
-            logger.error(f"Error saving project: {str(e)}")
+            logger.error(f"Error saving project: {e}")
+            return False
 
     def save_complete_project(self, alternatives=None, criteria=None):
         """Save the complete project with all data from UI"""
@@ -119,18 +115,83 @@ class ProjectController:
         return result
     
     def get_decision_matrix(self):
-        """Get decision matrix for current project"""
+        """Get decision matrix with consistent structure for all tabs"""
         if not self.current_project_id:
             return {}
-        return self.api_client.get_decision_matrix(self.current_project_id)
+        
+        try:
+            # Obtener datos del API
+            matrix_data = self.api_client.get_decision_matrix(self.current_project_id)
+            
+            # Si no hay datos, devolver estructura vacía consistente
+            if not matrix_data or (not matrix_data.get('matrix_data') and not matrix_data.get('alternatives')):
+                # Intentar construir la estructura desde el proyecto
+                alternatives = self.get_alternatives()
+                criteria = self.get_criteria()
+                
+                return {
+                    'alternatives': alternatives,
+                    'criteria': criteria,
+                    'matrix_data': {},
+                    'criteria_config': {}
+                }
+            
+            # Asegurar que la estructura sea consistente
+            if 'alternatives' not in matrix_data:
+                matrix_data['alternatives'] = self.get_alternatives()
+            if 'criteria' not in matrix_data:
+                matrix_data['criteria'] = self.get_criteria()
+            
+            return matrix_data
+            
+        except Exception as e:
+            logger.error(f"Error getting decision matrix: {e}")
+            return {
+                'alternatives': self.get_alternatives(),
+                'criteria': self.get_criteria(),
+                'matrix_data': {},
+                'criteria_config': {}
+            }
 
     def save_decision_matrix(self, matrix_data, criteria_config):
-        """Save decision matrix for current project"""
+        """Save decision matrix with validation"""
         if not self.current_project_id:
             return False
-        return self.api_client.save_decision_matrix(
-            self.current_project_id, matrix_data, criteria_config
-        )
+        
+        try:
+            # Validar que hay datos para guardar
+            if not matrix_data and not criteria_config:
+                logger.warning("No matrix data or config to save")
+                return True  # No es un error, simplemente no hay nada que guardar
+            
+            return self.api_client.save_decision_matrix(
+                self.current_project_id, 
+                matrix_data, 
+                criteria_config
+            )
+        except Exception as e:
+            logger.error(f"Error saving decision matrix: {e}")
+            return False
+
+    def save_decision_matrix_complete(self, complete_data):
+        """Save complete matrix data including alternatives and criteria"""
+        if not self.current_project_id:
+            return False
+        
+        try:
+            # Extraer componentes
+            matrix_data = complete_data.get('matrix_data', {})
+            criteria_config = complete_data.get('criteria_config', {})
+            
+            # Guardar usando el método existente
+            return self.api_client.save_decision_matrix(
+                self.current_project_id, 
+                matrix_data, 
+                criteria_config
+            )
+        except Exception as e:
+            logger.error(f"Error saving complete decision matrix: {e}")
+            return False
 
     def create_decision_matrix(self, name=None, values=None):
         """Create decision matrix for current project"""
@@ -220,11 +281,19 @@ class ProjectController:
             return {}
         return self.api_client.compare_methods(self.current_project_id, method_names)
 
-    def get_method_results(self, method_name=None):
-        """Get results for a specific method or all methods"""
+    def get_method_results(self) -> Optional[Dict[str, Dict]]:
+        """Obtener resultados de métodos guardados"""
         if not self.current_project_id:
-            return {}
-        return self.api_client.get_method_results(self.current_project_id, method_name)
+            return None
+        
+        try:
+            project = self.get_current_project()
+            if project:
+                return project.get('method_results', {})
+            return None
+        except Exception as e:
+            logger.error(f"Error getting method results: {e}")
+            return None
 
     def perform_sensitivity_analysis(self, method_name, criteria_id, 
                                 min_weight=0.1, max_weight=1.0, steps=10):
@@ -235,3 +304,66 @@ class ProjectController:
             self.current_project_id, method_name, criteria_id, 
             min_weight, max_weight, steps
         )
+    
+    def save_method_results(self, results_data: Dict[str, Dict]) -> bool:
+        """Guardar resultados de métodos MCDM en el proyecto"""
+        if not self.current_project_id:
+            logger.error("No current project to save results")
+            return False
+        
+        try:
+            # Obtener el proyecto actual
+            project = self.get_current_project()
+            if not project:
+                return False
+            
+            # Agregar los resultados al proyecto
+            project['method_results'] = results_data
+            
+            # Guardar el proyecto actualizado
+            return self.api_client.update_project(self.current_project_id, project)
+            
+        except Exception as e:
+            logger.error(f"Error saving method results: {e}")
+            return False
+    
+    def has_unsaved_changes(self) -> bool:
+        """Verificar si hay cambios sin guardar"""
+        # Este método puede ser extendido para verificar cambios en diferentes componentes
+        return False
+    
+    def get_project_status(self) -> Dict[str, Any]:
+        """Obtener estado completo del proyecto"""
+        if not self.current_project_id:
+            return {
+                'loaded': False,
+                'has_alternatives': False,
+                'has_criteria': False,
+                'has_matrix': False,
+                'has_results': False
+            }
+        
+        try:
+            project = self.get_current_project()
+            if not project:
+                return {'loaded': False}
+            
+            alternatives = self.get_alternatives()
+            criteria = self.get_criteria()
+            matrix = self.get_decision_matrix()
+            results = self.get_method_results()
+            
+            return {
+                'loaded': True,
+                'project_name': project.get('name', 'Unknown'),
+                'has_alternatives': bool(alternatives),
+                'has_criteria': bool(criteria),
+                'has_matrix': bool(matrix and matrix.get('matrix_data')),
+                'has_results': bool(results),
+                'alternatives_count': len(alternatives),
+                'criteria_count': len(criteria),
+                'results_count': len(results) if results else 0
+            }
+        except Exception as e:
+            logger.error(f"Error getting project status: {e}")
+            return {'loaded': False, 'error': str(e)}

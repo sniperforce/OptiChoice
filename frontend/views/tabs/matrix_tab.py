@@ -393,11 +393,13 @@ class MatrixTab(QWidget):
         
         # Tracking cambios
         self.pending_changes = set()  # Track cells with pending changes
+        self.is_programmatic_update = False  # NUEVO: Para evitar loops infinitos
         
-        # Auto-save timer principal (no por celda)
+        # Auto-save timer principal corregido
         self.auto_save_timer = QTimer()
         self.auto_save_timer.timeout.connect(self._perform_auto_save)
-        self.auto_save_timer.start(120000)  # 2 minutos
+        self.auto_save_timer.setInterval(30000)  # 30 segundos
+        self.auto_save_timer.start()
         
         self.init_ui()
         
@@ -684,6 +686,7 @@ class MatrixTab(QWidget):
             return
         
         self.state_manager.lock('load')
+        self.is_programmatic_update = True  # IMPORTANTE: Evitar triggers durante la carga
         
         try:
             if not self.project_controller.current_project_id:
@@ -699,9 +702,6 @@ class MatrixTab(QWidget):
             project_name = project.get('name', 'Unknown')
             self.project_label.setText(f"Project: {project_name}")
             self.project_label.setStyleSheet("color: #2e7d32; font-weight: bold;")
-            
-            # Invalidate cache to force refresh
-            self.cache.invalidate()
             
             # Load alternatives and criteria
             self._load_project_structure()
@@ -721,6 +721,7 @@ class MatrixTab(QWidget):
             logger.error(f"Error loading matrix data: {e}")
             QMessageBox.critical(self, "Error", f"Failed to load matrix data: {str(e)}")
         finally:
+            self.is_programmatic_update = False
             self.state_manager.unlock('load')
     
     def _handle_no_project(self):
@@ -779,23 +780,59 @@ class MatrixTab(QWidget):
             saved_data = self.project_controller.get_decision_matrix()
             
             if saved_data:
+                # Cargar datos de la matriz
                 self.matrix_data = saved_data.get('matrix_data', {})
                 saved_config = saved_data.get('criteria_config', {})
                 
-                # Apply saved configuration
+                logger.info(f"Loading saved config: {saved_config}")
+                
+                # Aplicar configuración guardada ANTES de actualizar valores
                 for crit_id, config_data in saved_config.items():
                     if crit_id in self.criteria_config:
-                        config = self.criteria_config[crit_id]
-                        config['scale_type_combo'].setCurrentText(config_data.get('scale_type', 'Numeric (Continuous)'))
-                        config['min_spin'].setValue(config_data.get('min_value', 0))
-                        config['max_spin'].setValue(config_data.get('max_value', 100))
-                        config['unit_edit'].setText(config_data.get('unit', ''))
+                        config_widgets = self.criteria_config[crit_id]
+                        
+                        # Bloquear señales temporalmente
+                        config_widgets['scale_type_combo'].blockSignals(True)
+                        config_widgets['min_spin'].blockSignals(True)
+                        config_widgets['max_spin'].blockSignals(True)
+                        
+                        # Aplicar valores
+                        config_widgets['scale_type_combo'].setCurrentText(
+                            config_data.get('scale_type', 'Numeric (Continuous)')
+                        )
+                        config_widgets['min_spin'].setValue(
+                            config_data.get('min_value', 0)
+                        )
+                        config_widgets['max_spin'].setValue(
+                            config_data.get('max_value', 100)
+                        )
+                        config_widgets['unit_edit'].setText(
+                            config_data.get('unit', '')
+                        )
+                        
+                        # Reactivar señales
+                        config_widgets['scale_type_combo'].blockSignals(False)
+                        config_widgets['min_spin'].blockSignals(False)
+                        config_widgets['max_spin'].blockSignals(False)
+                        
+                        logger.debug(f"Applied config for {crit_id}: min={config_data.get('min_value')}, max={config_data.get('max_value')}")
                 
-                # Update table with saved values
+                # Ahora actualizar valores de la tabla
                 self._update_table_values()
+                
+                # Limpiar cambios pendientes después de cargar
+                self.pending_changes.clear()
+                
+                # Actualizar completitud
+                self.update_completeness()
+                
+            else:
+                logger.info("No saved matrix data found")
                 
         except Exception as e:
             logger.error(f"Error loading saved matrix data: {e}")
+            import traceback
+            traceback.print_exc()
     
     def refresh_from_project(self):
         """Manual refresh - clears cache and reloads"""
@@ -814,6 +851,10 @@ class MatrixTab(QWidget):
     
     def on_cell_changed(self, row, col):
         """Handle cell value changes with proper validation"""
+        # Evitar procesamiento durante actualizaciones programáticas
+        if self.is_programmatic_update:
+            return
+            
         if not self.state_manager.can_proceed('cell_change'):
             return
         
@@ -846,43 +887,60 @@ class MatrixTab(QWidget):
                 self.matrix_data[key] = value
                 self.pending_changes.add(key)
                 
-                # Programar actualización de colores
-                self.timer_coordinator.schedule('color_update', self._update_display)
+                # Emitir señal de cambio inmediatamente
+                self.matrix_changed.emit()
                 
-                # Programar auto-save
-                self.timer_coordinator.schedule('autosave', self._perform_auto_save)
+                # Programar auto-save (con debounce)
+                self.timer_coordinator.schedule('autosave', self._perform_auto_save, delay=5000)  # 5 segundos
                 
                 # Programar validación si está habilitada
                 if VALIDATION_AVAILABLE and hasattr(self, 'validation_panel'):
                     if self.validation_panel.is_auto_validate_enabled():
-                        self.timer_coordinator.schedule('validation', self.run_validation_auto)
-                
-                # Emitir señal de cambio
-                self.matrix_changed.emit()
+                        self.timer_coordinator.schedule('validation', self.run_validation_auto, delay=1000)
         else:
             QMessageBox.warning(self, "Invalid Value", 
                             f"Invalid value for criterion {crit_id}")
+            self.is_programmatic_update = True
             item.setText(self.matrix_data.get(key, ""))
+            self.is_programmatic_update = False
     
     def validate_cell_value(self, value: str, crit_id: str) -> bool:
         """Validate a cell value according to criterion configuration"""
         if not value:
-            return True
+            return True  # Permitir celdas vacías
         
+        # Verificar si hay configuración para este criterio
         if crit_id not in self.criteria_config:
+            # Sin configuración, solo validar que sea numérico
             try:
                 float(value)
                 return True
             except ValueError:
                 return False
         
+        # Obtener configuración actual del criterio
         config = self.criteria_config[crit_id]
+        
+        # Leer valores actuales de los widgets
         min_val = config['min_spin'].value()
         max_val = config['max_spin'].value()
+        scale_type = config['scale_type_combo'].currentText()
         
         try:
             num_value = float(value)
-            return min_val <= num_value <= max_val
+            
+            # Validar según el tipo de escala
+            if "Continuous" in scale_type or "Numeric" in scale_type:
+                if num_value < min_val or num_value > max_val:
+                    QMessageBox.warning(
+                        self, 
+                        "Value Out of Range",
+                        f"Value {num_value} is outside the configured range [{min_val}, {max_val}]"
+                    )
+                    return False
+            
+            return True
+            
         except ValueError:
             return False
     
@@ -963,59 +1021,75 @@ class MatrixTab(QWidget):
     
     def save_matrix_manual(self):
         """Manual save from button"""
-        self._save_matrix(show_success=True)
+        self.save_matrix(show_success=True)
     
     def _perform_auto_save(self):
-        """Auto-save logic"""
-        if self.pending_changes and self.project_controller.current_project_id:
-            logger.info(f"Auto-saving {len(self.pending_changes)} changes...")
-            self._save_matrix(show_success=False)
-            
-            # Update indicator
-            self.autosave_indicator.setText("💾 Auto-saved")
-            QTimer.singleShot(2000, lambda: self.autosave_indicator.setText("💾 Auto-save: ON"))
-    
-    def _save_matrix(self, show_success: bool = False):
-        """Core save logic with state management"""
-        if not self.state_manager.can_proceed('save'):
+        """Realizar auto-guardado mejorado"""
+        if not self.pending_changes:
             return
         
+        if not self.state_manager.can_proceed('save'):
+            # Si no puede guardar ahora, reprogramar para más tarde
+            self.timer_coordinator.schedule('autosave', self._perform_auto_save, delay=10000)
+            return
+        
+        try:
+            logger.info(f"Auto-saving {len(self.pending_changes)} changes...")
+            
+            # IMPORTANTE: Forzar guardado aunque no haya éxito visual
+            self.save_matrix(show_success=False)
+            
+            # También guardar el proyecto completo para asegurar persistencia
+            if self.project_controller.current_project_id:
+                project = self.project_controller.get_current_project()
+                if project:
+                    # Guardar estado actual de la matriz en el proyecto
+                    project['has_unsaved_matrix_changes'] = False
+                    self.project_controller.save_project(project)
+            
+        except Exception as e:
+            logger.error(f"Auto-save failed: {e}")
+
+    
+    def save_matrix(self, show_success=True):
+        """Save matrix data with complete structure"""
         if not self.project_controller.current_project_id:
             if show_success:
                 QMessageBox.warning(self, "Warning", "No project loaded")
             return
         
+        if not self.state_manager.can_proceed('save'):
+            logger.warning("Save operation already in progress")
+            return
+        
         self.state_manager.lock('save')
         
         try:
-            # Check for blocking validation issues
-            if VALIDATION_AVAILABLE and hasattr(self, 'validator'):
-                if self.last_validation_results:
-                    critical_issues = [r for r in self.last_validation_results 
-                                     if r.severity == ValidationSeverity.CRITICAL]
-                    
-                    if critical_issues and show_success:
-                        reply = QMessageBox.question(
-                            self, "Validation Issues", 
-                            f"{len(critical_issues)} critical issue(s) detected. Save anyway?",
-                            QMessageBox.Yes | QMessageBox.No
-                        )
-                        if reply == QMessageBox.No:
-                            return
+            # Obtener alternativas y criterios actuales
+            alternatives = self.cache.get('alternatives')
+            criteria = self.cache.get('criteria')
             
-            # Prepare data
-            criteria_config_data = self._get_current_criteria_config()
+            if not alternatives or not criteria:
+                # Si no están en cache, obtener del API
+                alternatives = self.project_controller.get_alternatives()
+                criteria = self.project_controller.get_criteria()
             
-            # Save
-            success = self.project_controller.save_decision_matrix(
-                self.matrix_data, criteria_config_data
-            )
+            # Preparar datos completos para guardar
+            complete_data = {
+                'alternatives': alternatives,
+                'criteria': criteria,
+                'matrix_data': self.matrix_data,
+                'criteria_config': self._get_current_criteria_config()
+            }
+            
+            # Guardar con estructura completa
+            success = self.project_controller.save_decision_matrix_complete(complete_data)
             
             if success:
                 self.pending_changes.clear()
                 if show_success:
                     QMessageBox.information(self, "Success", "Matrix saved successfully")
-                logger.info("Matrix saved successfully")
+                logger.info("Matrix saved successfully with complete structure")
             else:
                 if show_success:
                     QMessageBox.critical(self, "Error", "Failed to save matrix")
@@ -1225,19 +1299,24 @@ class MatrixTab(QWidget):
         self._update_display()
     
     def _update_table_values(self):
-        """Update table values from matrix_data"""
-        for i in range(self.matrix_table.rowCount()):
-            for j in range(self.matrix_table.columnCount()):
-                item = self.matrix_table.item(i, j)
-                if item and item.data(Qt.UserRole):
-                    data = item.data(Qt.UserRole)
-                    key = f"{data['alt_id']}_{data['crit_id']}"
-                    value = self.matrix_data.get(key, "")
-                    
-                    # Temporarily disconnect signal to avoid triggering on_cell_changed
-                    self.matrix_table.cellChanged.disconnect()
-                    item.setText(str(value))
-                    self.matrix_table.cellChanged.connect(self.on_cell_changed)
+        """Update table cells with saved values"""
+        if self.is_programmatic_update:
+            return
+            
+        self.is_programmatic_update = True
+        try:
+            for row in range(self.matrix_table.rowCount()):
+                for col in range(self.matrix_table.columnCount()):
+                    item = self.matrix_table.item(row, col)
+                    if item:
+                        data = item.data(Qt.UserRole)
+                        if data:
+                            key = f"{data['alt_id']}_{data['crit_id']}"
+                            value = self.matrix_data.get(key, "")
+                            if item.text() != value:
+                                item.setText(value)
+        finally:
+            self.is_programmatic_update = False
     
     def update_matrix_colors(self):
         """Update cell colors with improved logic"""
@@ -1640,17 +1719,28 @@ class MatrixTab(QWidget):
         
         help_dialog.exec_()
     
-    def _get_current_criteria_config(self) -> Dict[str, Dict]:
-        """Get current criteria configuration"""
-        config = {}
-        for crit_id, ui_config in self.criteria_config.items():
-            config[crit_id] = {
-                'scale_type': ui_config['scale_type_combo'].currentText(),
-                'min_value': ui_config['min_spin'].value(),
-                'max_value': ui_config['max_spin'].value(),
-                'unit': ui_config['unit_edit'].text()
+    def _get_current_criteria_config(self):
+        """Get current criteria configuration with all details"""
+        config_data = {}
+        
+        for crit_id, config in self.criteria_config.items():
+            # Obtener valores actuales de los widgets
+            scale_type = config['scale_type_combo'].currentText()
+            min_value = config['min_spin'].value()
+            max_value = config['max_spin'].value()
+            unit = config['unit_edit'].text()
+            
+            config_data[crit_id] = {
+                'scale_type': scale_type,
+                'min_value': min_value,
+                'max_value': max_value,
+                'unit': unit,
+                'configured': True  # Marcar como configurado
             }
-        return config
+            
+            logger.debug(f"Config for {crit_id}: {config_data[crit_id]}")
+        
+        return config_data
     
     def closeEvent(self, event):
         """Handle tab close event"""

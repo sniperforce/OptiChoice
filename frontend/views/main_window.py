@@ -15,6 +15,7 @@ class MCDMApplication(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        self.previous_tab_index = 0  # NUEVO: Para rastrear la pestaña anterior
         self.init_ui()
         
     def init_ui(self):
@@ -37,6 +38,7 @@ class MCDMApplication(QMainWindow):
         # Initialize tabs
         self.init_tabs()
 
+        # IMPORTANTE: Conectar aboutToChange para guardar antes de cambiar
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
         
     def create_menu_bar(self):
@@ -243,7 +245,6 @@ class MCDMApplication(QMainWindow):
         self.matrix_tab.matrix_changed.connect(self.on_matrix_changed)
         self.method_tab.methods_executed.connect(self.on_methods_executed)
     
-
         # Results tab
         self.results_tab = ResultsTab(self.project_controller)
         self.tab_widget.addTab(self.results_tab, "Results")
@@ -257,18 +258,42 @@ class MCDMApplication(QMainWindow):
         self.tab_widget.addTab(self.sensitivity_tab, "Sensitivity Analysis")
     
     def on_tab_changed(self, index):
-        """Handle tab changes to sync data"""
+        """Handle tab changes to sync data - IMPROVED VERSION"""
+        
+        # CRÍTICO: Guardar matriz antes de cambiar si venimos de la pestaña de matriz
+        if self.previous_tab_index == 1 and hasattr(self, 'matrix_tab'):
+            if self.matrix_tab.pending_changes:
+                logger.info("Forcing matrix save before tab change...")
+                try:
+                    # Forzar guardado sin mostrar mensaje
+                    self.matrix_tab.save_matrix(show_success=False)
+                    # Esperar un momento para que se complete
+                    QApplication.processEvents()
+                except Exception as e:
+                    logger.error(f"Error saving matrix on tab change: {e}")
+        
+        # Ahora procesar la nueva pestaña
         if index == 1:  # Decision Matrix tab
             if hasattr(self, 'matrix_tab'):
+                # Siempre recargar para asegurar sincronización
                 self.matrix_tab.load_matrix_data()
+                
         elif index == 2:  # Method Selection tab
             if hasattr(self, 'method_tab'):
+                # Forzar recarga del estado de la matriz
                 self.method_tab.refresh_on_tab_change()
-        elif index == 3:  # Results tab - AÑADIR ESTO
+                # Verificar estado inmediatamente
+                self.method_tab.check_matrix_status()
+                
+        elif index == 3:  # Results tab
             if hasattr(self, 'results_tab'):
-                self.results_tab.refresh_on_tab_change()
+                if not self.results_tab.results_data:
+                    self.results_tab.load_results()
         
-        # Actualizar status bar según la pestaña
+        # Actualizar el índice de la pestaña anterior
+        self.previous_tab_index = index
+        
+        # Actualizar status bar
         tab_names = ["Project Manager", "Decision Matrix", "Method Selection", "Results", "Visualization", "Sensitivity Analysis"]
         if index < len(tab_names):
             self.statusBar.showMessage(f"Current tab: {tab_names[index]}")
@@ -282,6 +307,13 @@ class MCDMApplication(QMainWindow):
     def on_methods_executed(self, results):
         """Handle methods execution completion"""
         try:
+            # IMPORTANTE: Guardar resultados en el proyecto antes de cambiar de pestaña
+            if self.project_controller.current_project_id and results:
+                project = self.project_controller.get_current_project()
+                if project:
+                    project['method_results'] = results
+                    self.project_controller.save_project(project)
+            
             # Switch to results tab
             self.tab_widget.setCurrentIndex(3)
             
@@ -328,9 +360,26 @@ class MCDMApplication(QMainWindow):
             self.matrix_tab.load_matrix_data()
         
         if hasattr(self, 'results_tab'):
-            self.results_tab.results_data = {}
-            self.results_tab.update_display()
-            self.results_tab.status_label.setText("No results loaded")
+            # NO limpiar los resultados, solo marcar que necesita recarga
+            self.results_tab.status_label.setText("Project changed - refresh to load results")
+
+    def closeEvent(self, event):
+        """Handle application close event"""
+        # Guardar cualquier cambio pendiente antes de cerrar
+        if hasattr(self, 'matrix_tab') and self.matrix_tab.pending_changes:
+            reply = QMessageBox.question(self, 'Save Changes?',
+                                       'You have unsaved changes in the decision matrix. Save before closing?',
+                                       QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
+            
+            if reply == QMessageBox.Yes:
+                self.matrix_tab.save_matrix(show_success=False)
+                event.accept()
+            elif reply == QMessageBox.No:
+                event.accept()
+            else:
+                event.ignore()
+        else:
+            event.accept()
 
     # File menu actions
     def new_project(self):
