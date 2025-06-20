@@ -9,11 +9,13 @@ import json
 import glob
 from typing import Dict, List, Optional, Any
 import re
+import logging
 
 from domain.repositories.project_repository import ProjectRepository
 from domain.entities.project import Project
 from utils.exceptions import RepositoryError
 
+logger = logging.getLogger(__name__)
 
 class FileProjectRepository(ProjectRepository):
     
@@ -29,23 +31,37 @@ class FileProjectRepository(ProjectRepository):
             )
     
     def save(self, project: Project) -> Project:
+        """Save project with proper error handling"""
         try:
+            # CORRECCIÓN: Usar directamente to_dict() del proyecto
             project_dict = project.to_dict()
             
             file_path = os.path.join(self._base_dir, f"project_{project.id}.json")
             
-            with open(file_path, 'w', encoding='utf-8') as f:
+            # Crear directorio si no existe
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # Guardar con escritura atómica
+            temp_path = file_path + '.tmp'
+            with open(temp_path, 'w', encoding='utf-8') as f:
                 json.dump(project_dict, f, indent=2, ensure_ascii=False)
+            
+            # Reemplazar archivo existente
+            os.replace(temp_path, file_path)
             
             return project
             
         except Exception as e:
+            # Limpiar archivo temporal si existe
+            if 'temp_path' in locals() and os.path.exists(temp_path):
+                os.remove(temp_path)
             raise RepositoryError(
                 message=f"Error saving project to file: {str(e)}",
                 cause=e
             )
     
     def get_by_id(self, project_id: str) -> Optional[Project]:
+        """Get project by ID with proper deserialization"""
         try:
             file_path = os.path.join(self._base_dir, f"project_{project_id}.json")
             
@@ -55,16 +71,12 @@ class FileProjectRepository(ProjectRepository):
             with open(file_path, 'r', encoding='utf-8') as f:
                 project_dict = json.load(f)
             
+            # CORRECCIÓN: from_dict ya maneja la deserialización de DecisionMatrix
             return Project.from_dict(project_dict)
             
-        except json.JSONDecodeError as e:
-            raise RepositoryError(
-                message=f"Error decoding JSON for project {project_id}: {str(e)}",
-                cause=e
-            )
         except Exception as e:
             raise RepositoryError(
-                message=f"Error retrieving project {project_id}: {str(e)}",
+                message=f"Error loading project from file: {str(e)}",
                 cause=e
             )
         

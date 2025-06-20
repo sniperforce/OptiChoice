@@ -1064,7 +1064,7 @@ class MatrixTab(QWidget):
 
     
     def save_matrix(self, show_success=True):
-        """Save matrix data with complete structure - IMPROVED"""
+        """Save matrix data with complete structure - FIXED"""
         if not self.project_controller.current_project_id:
             if show_success:
                 QMessageBox.warning(self, "Warning", "No project loaded")
@@ -1078,50 +1078,44 @@ class MatrixTab(QWidget):
         
         try:
             # Obtener alternativas y criterios actuales
-            alternatives = self.cache.get('alternatives')
-            criteria = self.cache.get('criteria')
+            alternatives = self.project_controller.get_alternatives()
+            criteria = self.project_controller.get_criteria()
             
             if not alternatives or not criteria:
-                # Si no están en cache, obtener del API
-                alternatives = self.project_controller.get_alternatives()
-                criteria = self.project_controller.get_criteria()
-                # Actualizar cache
-                self.cache.set('alternatives', alternatives)
-                self.cache.set('criteria', criteria)
+                if show_success:
+                    QMessageBox.warning(self, "Warning", "No alternatives or criteria defined")
+                return False
             
             # Obtener configuración actual
             current_config = self._get_current_criteria_config()
             
-            # IMPORTANTE: Asegurar que matrix_data tiene todos los valores actuales
-            # incluso si están vacíos
+            # CORRECCIÓN: Recolectar TODOS los valores de la tabla
             complete_matrix_data = {}
+            for row in range(self.matrix_table.rowCount()):
+                for col in range(self.matrix_table.columnCount()):
+                    item = self.matrix_table.item(row, col)
+                    if item:
+                        data = item.data(Qt.UserRole)
+                        if data:
+                            key = f"{data['alt_id']}_{data['crit_id']}"
+                            value = item.text().strip()
+                            complete_matrix_data[key] = value
+            
+            # CORRECCIÓN: Asegurar que todos los pares alt-crit existen
             for alt in alternatives:
                 for crit in criteria:
                     key = f"{alt['id']}_{crit['id']}"
-                    # Obtener valor de la tabla si no está en matrix_data
-                    if key not in self.matrix_data:
-                        # Buscar en la tabla
-                        row = next((i for i, a in enumerate(alternatives) if a['id'] == alt['id']), -1)
-                        col = next((j for j, c in enumerate(criteria) if c['id'] == crit['id']), -1)
-                        if row >= 0 and col >= 0:
-                            item = self.matrix_table.item(row, col)
-                            if item and item.text():
-                                complete_matrix_data[key] = item.text()
-                            else:
-                                complete_matrix_data[key] = ""
-                        else:
-                            complete_matrix_data[key] = ""
-                    else:
-                        complete_matrix_data[key] = self.matrix_data[key]
+                    if key not in complete_matrix_data:
+                        complete_matrix_data[key] = ""
             
             # Actualizar matrix_data con los valores completos
             self.matrix_data = complete_matrix_data
             
             # Log para debug
-            logger.info(f"Saving matrix with {len(self.matrix_data)} values")
-            logger.info(f"Matrix data keys: {list(self.matrix_data.keys())[:5]}...")
+            non_empty = sum(1 for v in self.matrix_data.values() if v)
+            logger.info(f"Saving matrix with {len(self.matrix_data)} cells, {non_empty} non-empty")
             
-            # Preparar datos completos para guardar
+            # Preparar datos completos
             complete_data = {
                 'alternatives': alternatives,
                 'criteria': criteria,
@@ -1129,18 +1123,18 @@ class MatrixTab(QWidget):
                 'criteria_config': current_config
             }
             
-            # Guardar con estructura completa
-            success = self.project_controller.save_decision_matrix_complete(complete_data)
+            # CORRECCIÓN: Usar save_decision_matrix directamente
+            success = self.project_controller.api_client.save_decision_matrix(
+                self.project_controller.current_project_id,
+                self.matrix_data.copy(),
+                current_config
+            )
             
             if success:
                 self.pending_changes.clear()
                 
-                # Actualizar estado en el proyecto
-                project = self.project_controller.get_current_project()
-                if project:
-                    # Guardar estado actual de la matriz en el proyecto
-                    project['has_unsaved_matrix_changes'] = False
-                    self.project_controller.save_project(project)
+                # CORRECCIÓN: Forzar actualización del proyecto
+                self.project_controller.save_current_project()
                 
                 if show_success:
                     QMessageBox.information(self, "Success", "Matrix saved successfully")

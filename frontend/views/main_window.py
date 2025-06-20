@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QTabWidget, QAction, 
                              QMenu, QToolBar, QStatusBar, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QMessageBox)
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtGui import QIcon, QFont
 from controllers.project_controller import ProjectController
 from PyQt5.QtWidgets import QFileDialog, QInputDialog
@@ -258,26 +258,32 @@ class MCDMApplication(QMainWindow):
         self.tab_widget.addTab(self.sensitivity_tab, "Sensitivity Analysis")
     
     def on_tab_changed(self, index):
-        """Handle tab changes to sync data - FINAL VERSION"""
+        """Handle tab changes to sync data - FIXED VERSION"""
         
-        # CRÍTICO: Guardar matriz antes de cambiar si venimos de la pestaña de matriz
+        # CORRECCIÓN: Mejorar la lógica de guardado
         if self.previous_tab_index == 1 and hasattr(self, 'matrix_tab'):
-            # Verificar si hay cambios pendientes O datos en la matriz
-            if self.matrix_tab.pending_changes or len(self.matrix_tab.matrix_data) > 0:
+            # Solo guardar si hay cambios pendientes O datos significativos
+            if self.matrix_tab.pending_changes or self._has_matrix_data():
                 logger.info("Saving matrix data before tab change...")
                 try:
                     # Bloquear cambio de pestañas temporalmente
                     self.tab_widget.blockSignals(True)
                     
-                    # Forzar guardado
+                    # Forzar guardado sincrónico
                     save_success = self.matrix_tab.save_matrix(show_success=False)
                     
-                    # Procesar eventos y esperar
-                    QApplication.processEvents()
-                    import time
-                    time.sleep(0.3)  # Esperar más tiempo
-                    
-                    if not save_success:
+                    if save_success:
+                        # CORRECCIÓN: Esperar más tiempo y forzar sincronización
+                        from PyQt5.QtWidgets import QApplication
+                        QApplication.processEvents()
+                        import time
+                        time.sleep(0.5)  # Aumentar tiempo de espera
+                        
+                        # Forzar recarga del proyecto para asegurar sincronización
+                        if self.project_controller.current_project_id:
+                            self.project_controller.load_project(self.project_controller.current_project_id)
+                    else:
+                        from PyQt5.QtWidgets import QMessageBox
                         reply = QMessageBox.question(
                             self, 
                             'Save Failed',
@@ -285,7 +291,7 @@ class MCDMApplication(QMainWindow):
                             QMessageBox.Yes | QMessageBox.No
                         )
                         if reply == QMessageBox.No:
-                            # Volver a la pestaña anterior
+                            # Restaurar pestaña anterior
                             self.tab_widget.setCurrentIndex(self.previous_tab_index)
                             self.tab_widget.blockSignals(False)
                             return
@@ -295,32 +301,31 @@ class MCDMApplication(QMainWindow):
                 finally:
                     self.tab_widget.blockSignals(False)
         
-        # Procesar la nueva pestaña
-        if index == 1:  # Decision Matrix tab
-            if hasattr(self, 'matrix_tab'):
-                # Recargar datos para asegurar sincronización
-                QApplication.processEvents()
-                self.matrix_tab.load_matrix_data()
-                
-        elif index == 2:  # Method Selection tab
-            if hasattr(self, 'method_tab'):
-                # Esperar antes de verificar
-                QApplication.processEvents()
-                import time
-                time.sleep(0.2)
-                self.method_tab.check_matrix_status()
-                
-        elif index == 3:  # Results tab
-            if hasattr(self, 'results_tab'):
-                if not self.results_tab.results_data:
-                    self.results_tab.load_results()
-        
-        # Actualizar el índice de la pestaña anterior
+        # Actualizar índice de pestaña anterior
         self.previous_tab_index = index
         
-        # Actualizar status bar
-        tab_names = ["Project Manager", "Decision Matrix", "Method Selection", "Results", "Visualization", "Sensitivity Analysis"]
-        if index < len(tab_names):
+        # CORRECCIÓN: Recargar datos en las pestañas según corresponda
+        if index == 2 and hasattr(self, 'method_tab'):
+            # Pestaña de Method Selection - verificar estado de la matriz
+            # Dar tiempo para que se complete el guardado
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(100, self.method_tab.check_matrix_status)
+        
+        elif index == 3 and hasattr(self, 'results_tab'):
+            # Pestaña de Results - cargar resultados si existen
+            try:
+                project = self.project_controller.get_current_project()
+                if project and 'method_results' in project:
+                    # Actualizar la pestaña de resultados con los datos guardados
+                    self.results_tab.update_with_results(project['method_results'])
+                    logger.info("Loaded saved results into results tab")
+            except Exception as e:
+                logger.error(f"Error loading results: {e}")
+        
+        # Mostrar nombre de la pestaña actual
+        tab_names = ["Project Manager", "Problem Definition", "Decision Matrix", 
+                    "Method Selection", "Results", "Visualization", "Sensitivity Analysis"]
+        if 0 <= index < len(tab_names):
             self.statusBar.showMessage(f"Current tab: {tab_names[index]}")
 
     def on_matrix_changed(self):
@@ -354,6 +359,19 @@ class MCDMApplication(QMainWindow):
             logger.error(f"Error updating results: {str(e)}")
             QMessageBox.critical(self, "Error", f"Failed to display results: {str(e)}")
             self.statusBar.showMessage("Error displaying results")
+
+    def _has_matrix_data(self):
+        """Check if matrix has any significant data"""
+        if not hasattr(self, 'matrix_tab'):
+            return False
+        
+        # Verificar si hay datos en la matriz
+        if self.matrix_tab.matrix_data:
+            # Contar valores no vacíos
+            non_empty_values = sum(1 for v in self.matrix_tab.matrix_data.values() if v.strip())
+            return non_empty_values > 0
+        
+        return False
 
     # Actualizar el método execute_method en los menús
     def execute_method(self, method_name):

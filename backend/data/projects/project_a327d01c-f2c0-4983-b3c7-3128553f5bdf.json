@@ -1,0 +1,112 @@
+{
+  "id": "a327d01c-f2c0-4983-b3c7-3128553f5bdf",
+  "name": "probando",
+  "description": "asdoivzoibc",
+  "decision_maker": "Diego",
+  "created_at": "2025-06-20T12:41:10.843711",
+  "updated_at": "2025-06-20T12:49:38.298226",
+  "alternatives": [
+    {
+      "id": "A1",
+      "name": "reger",
+      "description": "abasdba",
+      "metadata": {}
+    },
+    {
+      "id": "A2",
+      "name": "zcbzcb",
+      "description": "gfsnsgn",
+      "metadata": {}
+    }
+  ],
+  "criteria": [
+    {
+      "id": "C1",
+      "name": "zcbzcb",
+      "description": "",
+      "optimization_type": "minimize",
+      "scale_type": "quantitative",
+      "weight": 1.0,
+      "unit": "",
+      "metadata": {}
+    },
+    {
+      "id": "C2",
+      "name": "zcbzvn",
+      "description": "",
+      "optimization_type": "maximize",
+      "scale_type": "quantitative",
+      "weight": 1.0,
+      "unit": "",
+      "metadata": {}
+    }
+  ],
+  "metadata": {
+    "criteria_config": {
+      "C1": {
+        "scale_type": "Numeric (Continuous)",
+        "min_value": 0.0,
+        "max_value": 100.0,
+        "unit": "",
+        "configured": true
+      },
+      "C2": {
+        "scale_type": "Numeric (Continuous)",
+        "min_value": 0.0,
+        "max_value": 100.0,
+        "unit": "",
+        "configured": true
+      }
+    }
+  },
+  "results": {},
+  "decision_matrix": {
+    "name": "Decision Matrix",
+    "alternatives": [
+      {
+        "id": "A1",
+        "name": "reger",
+        "description": "abasdba",
+        "metadata": {}
+      },
+      {
+        "id": "A2",
+        "name": "zcbzcb",
+        "description": "gfsnsgn",
+        "metadata": {}
+      }
+    ],
+    "criteria": [
+      {
+        "id": "C1",
+        "name": "zcbzcb",
+        "description": "",
+        "optimization_type": "minimize",
+        "scale_type": "quantitative",
+        "weight": 1.0,
+        "unit": "",
+        "metadata": {}
+      },
+      {
+        "id": "C2",
+        "name": "zcbzvn",
+        "description": "",
+        "optimization_type": "maximize",
+        "scale_type": "quantitative",
+        "weight": 1.0,
+        "unit": "",
+        "metadata": {}
+      }
+    ],
+    "values": [
+      [
+        4.0,
+        7.0
+      ],
+      [
+        6.0,
+        1.0
+      ]
+    ]
+  }
+}

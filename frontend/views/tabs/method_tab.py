@@ -806,7 +806,7 @@ class MethodTab(QWidget):
         self.methods_container_layout.addWidget(card)
     
     def check_matrix_status(self) -> bool:
-        """Check if matrix is ready for methods"""
+        """Check if matrix is ready for methods - FIXED"""
         try:
             # Check if project is loaded
             if not self.project_controller.current_project_id:
@@ -814,11 +814,17 @@ class MethodTab(QWidget):
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
                 return False
             
+            # CORRECCIÓN: Forzar recarga de datos del proyecto
+            self.project_controller.load_project(self.project_controller.current_project_id)
+            
             # Get complete matrix data
             complete_data = self.project_controller.get_decision_matrix()
             
             # Log para debug
-            logger.info(f"Method tab - Matrix data keys: {complete_data.keys()}")
+            logger.info(f"Method tab - Checking matrix status")
+            logger.info(f"Alternatives: {len(complete_data.get('alternatives', []))}")
+            logger.info(f"Criteria: {len(complete_data.get('criteria', []))}")
+            logger.info(f"Matrix values: {len(complete_data.get('matrix_data', {}))}")
             
             if not complete_data:
                 self.matrix_status.setText("⚠️ No decision matrix")
@@ -829,14 +835,8 @@ class MethodTab(QWidget):
             matrix_data = complete_data.get('matrix_data', {})
             alternatives = complete_data.get('alternatives', [])
             criteria = complete_data.get('criteria', [])
-            criteria_config = complete_data.get('criteria_config', {})
             
-            # Log para debug
-            logger.info(f"Alternatives: {len(alternatives)}, Criteria: {len(criteria)}")
-            logger.info(f"Matrix data entries: {len(matrix_data)}")
-            logger.info(f"Criteria config entries: {len(criteria_config)}")
-            
-            # Verificar que hay alternativas y criterios
+            # Verificar estructura
             if not alternatives or not criteria:
                 self.matrix_status.setText("⚠️ No alternatives or criteria defined")
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
@@ -850,15 +850,15 @@ class MethodTab(QWidget):
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
                 return False
             
-            # Contar celdas llenas
+            # CORRECCIÓN: Contar celdas llenas correctamente
             filled_cells = 0
             for alt in alternatives:
                 for crit in criteria:
                     key = f"{alt['id']}_{crit['id']}"
-                    if key in matrix_data and str(matrix_data[key]).strip():
+                    value = matrix_data.get(key, "")
+                    if value and str(value).strip() and str(value).strip() != "0":
                         try:
-                            # Verificar que es un número válido
-                            float(matrix_data[key])
+                            float(value)
                             filled_cells += 1
                         except ValueError:
                             pass
@@ -867,6 +867,7 @@ class MethodTab(QWidget):
             
             logger.info(f"Matrix completeness: {completeness:.1f}% ({filled_cells}/{total_cells})")
             
+            # Actualizar UI
             if completeness < 100:
                 self.matrix_status.setText(f"⚠️ Matrix {completeness:.0f}% complete")
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")

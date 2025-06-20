@@ -10,9 +10,11 @@ from domain.entities.criteria import Criteria
 from utils.normalization import normalize_matrix
 
 class DecisionMatrix:
-    def __init__(self, name: str, alternatives: List[Alternative], criteria: List[Criteria],
-                 values: Optional[Union[np.ndarray, List[List[float]]]] = None):
-        self._name = name
+    def __init__(self, alternatives: List[Alternative], criteria: List[Criteria],
+                 values: Optional[Union[np.ndarray, List[List[float]]]] = None, 
+                 name: Optional[str] = None):
+        # CORRECCIÓN: Hacer el nombre opcional con valor por defecto
+        self._name = name if name is not None else "Decision Matrix"
         self._alternatives = alternatives
         self._criteria = criteria
 

@@ -269,52 +269,32 @@ class MainController:
         except ValueError as e:
             raise ValueError(f"Error removing criterion: {str(e)}")
     
-    def get_decision_matrix(self) -> Optional[Dict[str, Any]]:
-        """Obtener la matriz de decisión del proyecto actual"""
+    def get_decision_matrix(self) -> Dict[str, Any]:
+        """Get decision matrix with all related data"""
         if self._current_project is None:
-            raise ValueError("There is no current project")
+            return {}
         
-        # Preparar estructura básica
         result = {
-            'alternatives': [
-                {'id': alt.id, 'name': alt.name} 
-                for alt in self._current_project.alternatives
-            ],
-            'criteria': [
-                {
-                    'id': crit.id, 
-                    'name': crit.name,
-                    'optimization_type': crit.optimization_type.value,
-                    'weight': crit.weight
-                } 
-                for crit in self._current_project.criteria
-            ],
+            'alternatives': [alt.to_dict() for alt in self._current_project.alternatives],
+            'criteria': [crit.to_dict() for crit in self._current_project.criteria],
             'matrix_data': {},
-            'criteria_config': {}
+            'criteria_config': self._current_project.get_metadata('criteria_config', {})
         }
         
-        # IMPORTANTE: Obtener la configuración guardada como metadata
-        saved_config = self._current_project.get_metadata('criteria_config', {})
-        if saved_config:
-            result['criteria_config'] = saved_config
-            print(f"Loaded criteria config from metadata: {saved_config}")
-        
-        # Si no hay matriz, devolver estructura con configuración
+        # CORRECCIÓN: Verificar si existe la matriz
         if self._current_project.decision_matrix is None:
             return result
         
-        # Si hay matriz, agregar los valores
         matrix = self._current_project.decision_matrix
-        matrix_data = {}
         
+        # Obtener valores de la matriz
+        matrix_data = {}
         for i, alt in enumerate(matrix.alternative):
             for j, crit in enumerate(matrix.criteria):
                 key = f"{alt.id}_{crit.id}"
-                try:
-                    value = matrix.get_value(i, j)
-                    matrix_data[key] = str(value) if value is not None else ""
-                except:
-                    matrix_data[key] = ""
+                value = matrix.get_values(i, j)
+                # CORRECCIÓN: Convertir valor a string para el frontend
+                matrix_data[key] = str(value) if value != 0 else ""
         
         result['matrix_data'] = matrix_data
         
@@ -364,27 +344,46 @@ class MainController:
             return False
         
         try:
-            # Crear matriz si no existe
+            # Asegurar que la matriz existe
             if self._current_project.decision_matrix is None:
+                # Solo crear si hay alternativas y criterios
+                if not self._current_project.alternatives or not self._current_project.criteria:
+                    print("Cannot create matrix without alternatives and criteria")
+                    return False
                 self._current_project.create_decision_matrix()
             
-            # Guardar configuración de criterios en metadata del proyecto
+            # Guardar configuración de criterios
             self._current_project.set_metadata('criteria_config', criteria_config)
             
             # Guardar valores de la matriz
             matrix = self._current_project.decision_matrix
             
-            # Actualizar valores individuales
-            for key, value in matrix_data.items():
-                if '_' in key:
-                    alt_id, crit_id = key.split('_', 1)
+            # Procesar todos los valores
+            for alt in self._current_project.alternatives:
+                for crit in self._current_project.criteria:
+                    key = f"{alt.id}_{crit.id}"
+                    value = matrix_data.get(key, "")
+                    
                     try:
-                        # Convertir valor a float si es posible
+                        # Convertir a float, usar 0 si está vacío
                         float_value = float(value) if value and value.strip() else 0.0
-                        self.set_matrix_value(alt_id, crit_id, float_value)
-                    except ValueError:
-                        # Si no se puede convertir, usar 0
-                        self.set_matrix_value(alt_id, crit_id, 0.0)
+                        
+                        # Obtener índices usando los métodos correctos de la matriz
+                        try:
+                            alt_idx, _ = matrix.get_alternative_by_id(alt.id)
+                            crit_idx, _ = matrix.get_criteria_by_id(crit.id)
+                            matrix.set_values(alt_idx, crit_idx, float_value)
+                        except ValueError:
+                            # Si no se encuentra la alternativa o criterio, continuar
+                            print(f"Warning: Alternative {alt.id} or criteria {crit.id} not found in matrix")
+                            continue
+                            
+                    except (ValueError, TypeError) as e:
+                        print(f"Error setting value for {key}: {e}")
+                        continue
+            
+            # Marcar proyecto como modificado
+            self._current_project._updated_at = datetime.now()
             
             # Guardar inmediatamente
             self.save_project()

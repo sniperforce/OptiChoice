@@ -175,14 +175,18 @@ class Project:
         if not self.alternatives or not self.criteria:
             raise ValueError("Cannot create matrix without alternatives and criteria")
         
+        # CORRECCIÓN: Crear matriz sin necesidad de nombre
         self._decision_matrix = DecisionMatrix(
-            alternatives=self.alternatives,
-            criteria=self.criteria
+            alternatives=list(self.alternatives),
+            criteria=list(self.criteria)
         )
+        
+        # Marcar proyecto como actualizado
+        self._updated_at = datetime.now()
 
     def set_decision_matrix(self, matrix: DecisionMatrix) -> None:
         matrix_alt_ids = {alt.id for alt in matrix.alternative}
-        project_alt_ids = {alt.od for alt in self._alternatives}
+        project_alt_ids = {alt.id for alt in self._alternatives}
 
         matrix_crit_ids = {crit.id for crit in matrix.criteria}
         project_crit_ids = {crit.id for crit in self._criteria}

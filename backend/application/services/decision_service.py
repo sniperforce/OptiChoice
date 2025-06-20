@@ -375,9 +375,21 @@ class DecisionService:
             ) from e
         
     def create_decision_matrix(self, project: Project, name: Optional[str] = None,
-                             values: Optional[List[List[float]]] = None) -> DecisionMatrix:
+                         values: Optional[List[List[float]]] = None) -> DecisionMatrix:
         try:
-            return project.create_decision_matrix(name, values)    
+            # CORRECCIÓN: project.create_decision_matrix no acepta parámetros
+            project.create_decision_matrix()
+            
+            # Si se proporcionaron valores, actualizarlos después
+            if values is not None and project.decision_matrix is not None:
+                matrix = project.decision_matrix
+                for i, row in enumerate(values):
+                    for j, value in enumerate(row):
+                        if i < matrix.shape[0] and j < matrix.shape[1]:
+                            matrix.set_values(i, j, float(value))
+            
+            return project.decision_matrix
+            
         except ValueError as e:
             raise ServiceError(
                 message=f"Error creating decision matrix: {str(e)}",

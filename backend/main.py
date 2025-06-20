@@ -267,16 +267,49 @@ def get_decision_matrix(project_id):
     try:
         controller.load_project(project_id)
         
-        # Usar el método corregido que incluye la configuración
+        # Verificar si el proyecto existe
+        project = controller.current_project
+        if not project:
+            return jsonify({'error': 'Project not found'}), 404
+        
+        # Si no hay matriz, intentar crearla
+        if project.decision_matrix is None:
+            try:
+                # Solo crear si hay alternativas y criterios
+                if project.alternatives and project.criteria:
+                    controller.create_decision_matrix()
+                    controller.save_project()
+                else:
+                    # Devolver estructura vacía si no hay alternativas/criterios
+                    return jsonify({
+                        'alternatives': [],
+                        'criteria': [],
+                        'matrix_data': {},
+                        'criteria_config': project.get_metadata('criteria_config', {})
+                    }), 200
+            except ValueError as e:
+                # Si falla la creación, devolver estructura vacía
+                return jsonify({
+                    'alternatives': [alt.to_dict() for alt in project.alternatives],
+                    'criteria': [crit.to_dict() for crit in project.criteria],
+                    'matrix_data': {},
+                    'criteria_config': project.get_metadata('criteria_config', {})
+                }), 200
+        
+        # Obtener datos de la matriz
         matrix_data = controller.get_decision_matrix()
         
         # Log para debug
-        print(f"Returning matrix data with config: {matrix_data.get('criteria_config', {})}")
+        print(f"Matrix data retrieved - Alternatives: {len(matrix_data.get('alternatives', []))}, "
+              f"Criteria: {len(matrix_data.get('criteria', []))}, "
+              f"Values: {len(matrix_data.get('matrix_data', {}))}")
         
         return jsonify(matrix_data)
         
     except Exception as e:
         print(f"Error getting decision matrix: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/projects/<project_id>/matrix/create', methods=['POST'])
@@ -312,8 +345,13 @@ def save_decision_matrix(project_id):
         
         # Log para debug
         print(f"Saving matrix for project {project_id}")
-        print(f"Matrix data keys: {list(data.get('matrix_data', {}).keys())[:5]}")
-        print(f"Criteria config: {data.get('criteria_config', {})}")
+        print(f"Matrix data entries: {len(data.get('matrix_data', {}))}")
+        print(f"Criteria config entries: {len(data.get('criteria_config', {}))}")
+        
+        # CORRECCIÓN: Crear matriz si no existe
+        project = controller.current_project
+        if project and project.decision_matrix is None:
+            controller.create_decision_matrix()
         
         # Save matrix data
         success = controller.save_decision_matrix(
@@ -322,12 +360,13 @@ def save_decision_matrix(project_id):
         )
         
         if success:
-            # Forzar guardado inmediato
+            # CORRECCIÓN: Forzar guardado completo del proyecto
             controller.save_project()
             
-            # Esperar un momento para asegurar persistencia
-            import time
-            time.sleep(0.1)
+            # Verificar que se guardó correctamente
+            saved_project = controller.current_project
+            if saved_project and saved_project.decision_matrix:
+                print(f"Matrix saved successfully with {saved_project.decision_matrix.shape[0]}x{saved_project.decision_matrix.shape[1]} dimensions")
             
             return jsonify({'success': True, 'message': 'Matrix saved successfully'}), 200
         else:
