@@ -817,6 +817,9 @@ class MethodTab(QWidget):
             # Get complete matrix data
             complete_data = self.project_controller.get_decision_matrix()
             
+            # Log para debug
+            logger.info(f"Method tab - Matrix data keys: {complete_data.keys()}")
+            
             if not complete_data:
                 self.matrix_status.setText("⚠️ No decision matrix")
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
@@ -826,6 +829,12 @@ class MethodTab(QWidget):
             matrix_data = complete_data.get('matrix_data', {})
             alternatives = complete_data.get('alternatives', [])
             criteria = complete_data.get('criteria', [])
+            criteria_config = complete_data.get('criteria_config', {})
+            
+            # Log para debug
+            logger.info(f"Alternatives: {len(alternatives)}, Criteria: {len(criteria)}")
+            logger.info(f"Matrix data entries: {len(matrix_data)}")
+            logger.info(f"Criteria config entries: {len(criteria_config)}")
             
             # Verificar que hay alternativas y criterios
             if not alternatives or not criteria:
@@ -833,7 +842,7 @@ class MethodTab(QWidget):
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
                 return False
             
-            # Calcular completitud correctamente
+            # Calcular completitud
             total_cells = len(alternatives) * len(criteria)
             
             if total_cells == 0:
@@ -841,30 +850,36 @@ class MethodTab(QWidget):
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
                 return False
             
-            # Contar celdas llenas usando la estructura correcta de keys
+            # Contar celdas llenas
             filled_cells = 0
             for alt in alternatives:
                 for crit in criteria:
                     key = f"{alt['id']}_{crit['id']}"
-                    if key in matrix_data and matrix_data[key].strip():
-                        filled_cells += 1
+                    if key in matrix_data and str(matrix_data[key]).strip():
+                        try:
+                            # Verificar que es un número válido
+                            float(matrix_data[key])
+                            filled_cells += 1
+                        except ValueError:
+                            pass
             
             completeness = (filled_cells / total_cells) * 100
             
-            logger.info(f"Matrix check - Total cells: {total_cells}, Filled: {filled_cells}, Completeness: {completeness:.1f}%")
+            logger.info(f"Matrix completeness: {completeness:.1f}% ({filled_cells}/{total_cells})")
             
             if completeness < 100:
                 self.matrix_status.setText(f"⚠️ Matrix {completeness:.0f}% complete")
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
                 
-                # Solo preguntar si es menor a 50%
                 if completeness < 50:
-                    reply = QMessageBox.question(self, "Incomplete Matrix",
-                                            f"Matrix is only {completeness:.0f}% complete. Continue anyway?",
-                                            QMessageBox.Yes | QMessageBox.No)
+                    reply = QMessageBox.question(
+                        self, 
+                        "Incomplete Matrix",
+                        f"Matrix is only {completeness:.0f}% complete. Continue anyway?",
+                        QMessageBox.Yes | QMessageBox.No
+                    )
                     return reply == QMessageBox.Yes
                 else:
-                    # Si es más del 50%, permitir continuar sin preguntar
                     return True
             else:
                 self.matrix_status.setText("✅ Matrix ready (100% complete)")

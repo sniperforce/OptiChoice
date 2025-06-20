@@ -1092,15 +1092,40 @@ class MatrixTab(QWidget):
             # Obtener configuración actual
             current_config = self._get_current_criteria_config()
             
+            # IMPORTANTE: Asegurar que matrix_data tiene todos los valores actuales
+            # incluso si están vacíos
+            complete_matrix_data = {}
+            for alt in alternatives:
+                for crit in criteria:
+                    key = f"{alt['id']}_{crit['id']}"
+                    # Obtener valor de la tabla si no está en matrix_data
+                    if key not in self.matrix_data:
+                        # Buscar en la tabla
+                        row = next((i for i, a in enumerate(alternatives) if a['id'] == alt['id']), -1)
+                        col = next((j for j, c in enumerate(criteria) if c['id'] == crit['id']), -1)
+                        if row >= 0 and col >= 0:
+                            item = self.matrix_table.item(row, col)
+                            if item and item.text():
+                                complete_matrix_data[key] = item.text()
+                            else:
+                                complete_matrix_data[key] = ""
+                        else:
+                            complete_matrix_data[key] = ""
+                    else:
+                        complete_matrix_data[key] = self.matrix_data[key]
+            
+            # Actualizar matrix_data con los valores completos
+            self.matrix_data = complete_matrix_data
+            
             # Log para debug
             logger.info(f"Saving matrix with {len(self.matrix_data)} values")
-            logger.info(f"Matrix data keys: {list(self.matrix_data.keys())[:5]}...")  # Mostrar primeras 5 keys
+            logger.info(f"Matrix data keys: {list(self.matrix_data.keys())[:5]}...")
             
             # Preparar datos completos para guardar
             complete_data = {
                 'alternatives': alternatives,
                 'criteria': criteria,
-                'matrix_data': self.matrix_data.copy(),  # Hacer copia para evitar modificaciones
+                'matrix_data': self.matrix_data.copy(),
                 'criteria_config': current_config
             }
             
@@ -1110,8 +1135,12 @@ class MatrixTab(QWidget):
             if success:
                 self.pending_changes.clear()
                 
-                # Forzar guardado del proyecto también
-                self.project_controller.save_current_project()
+                # Actualizar estado en el proyecto
+                project = self.project_controller.get_current_project()
+                if project:
+                    # Guardar estado actual de la matriz en el proyecto
+                    project['has_unsaved_matrix_changes'] = False
+                    self.project_controller.save_project(project)
                 
                 if show_success:
                     QMessageBox.information(self, "Success", "Matrix saved successfully")
@@ -1752,31 +1781,23 @@ class MatrixTab(QWidget):
         help_dialog.exec_()
     
     def _get_current_criteria_config(self):
-        """Get current criteria configuration with all details"""
-        config_data = {}
+        """Get current criteria configuration from UI widgets"""
+        config = {}
         
-        for crit_id, config in self.criteria_config.items():
+        for crit_id, widgets in self.criteria_config.items():
             try:
-                # Obtener valores actuales de los widgets
-                scale_type = config['scale_type_combo'].currentText()
-                min_value = config['min_spin'].value()
-                max_value = config['max_spin'].value()
-                unit = config['unit_edit'].text()
-                
-                config_data[crit_id] = {
-                    'scale_type': scale_type,
-                    'min_value': float(min_value),  # Asegurar que sea float
-                    'max_value': float(max_value),  # Asegurar que sea float
-                    'unit': unit,
-                    'configured': True
+                config[crit_id] = {
+                    'scale_type': widgets['scale_type_combo'].currentText(),
+                    'min_value': float(widgets['min_spin'].value()),
+                    'max_value': float(widgets['max_spin'].value()),
+                    'unit': widgets['unit_edit'].text(),
+                    'configured': True  # Marcar como configurado
                 }
-                
-                logger.debug(f"Saving config for {crit_id}: min={min_value}, max={max_value}")
-                
+                logger.info(f"Config for {crit_id}: {config[crit_id]}")
             except Exception as e:
                 logger.error(f"Error getting config for {crit_id}: {e}")
-                # Valores por defecto si hay error
-                config_data[crit_id] = {
+                # Valores por defecto en caso de error
+                config[crit_id] = {
                     'scale_type': 'Numeric (Continuous)',
                     'min_value': 0.0,
                     'max_value': 100.0,
@@ -1784,7 +1805,7 @@ class MatrixTab(QWidget):
                     'configured': False
                 }
         
-        return config_data
+        return config
     
     def closeEvent(self, event):
         """Handle tab close event"""

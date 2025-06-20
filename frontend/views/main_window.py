@@ -258,34 +258,57 @@ class MCDMApplication(QMainWindow):
         self.tab_widget.addTab(self.sensitivity_tab, "Sensitivity Analysis")
     
     def on_tab_changed(self, index):
-        """Handle tab changes to sync data - CORRECTED VERSION"""
+        """Handle tab changes to sync data - FINAL VERSION"""
         
         # CRÍTICO: Guardar matriz antes de cambiar si venimos de la pestaña de matriz
         if self.previous_tab_index == 1 and hasattr(self, 'matrix_tab'):
-            if self.matrix_tab.pending_changes:
-                logger.info("Forcing matrix save before tab change...")
+            # Verificar si hay cambios pendientes O datos en la matriz
+            if self.matrix_tab.pending_changes or len(self.matrix_tab.matrix_data) > 0:
+                logger.info("Saving matrix data before tab change...")
                 try:
-                    # Forzar guardado sin mostrar mensaje
-                    self.matrix_tab.save_matrix(show_success=False)
-                    # Esperar un momento para que se complete
+                    # Bloquear cambio de pestañas temporalmente
+                    self.tab_widget.blockSignals(True)
+                    
+                    # Forzar guardado
+                    save_success = self.matrix_tab.save_matrix(show_success=False)
+                    
+                    # Procesar eventos y esperar
                     QApplication.processEvents()
                     import time
-                    time.sleep(0.1)  # Pequeña pausa para asegurar que se complete
+                    time.sleep(0.3)  # Esperar más tiempo
+                    
+                    if not save_success:
+                        reply = QMessageBox.question(
+                            self, 
+                            'Save Failed',
+                            'Failed to save matrix data. Continue anyway?',
+                            QMessageBox.Yes | QMessageBox.No
+                        )
+                        if reply == QMessageBox.No:
+                            # Volver a la pestaña anterior
+                            self.tab_widget.setCurrentIndex(self.previous_tab_index)
+                            self.tab_widget.blockSignals(False)
+                            return
+                            
                 except Exception as e:
                     logger.error(f"Error saving matrix on tab change: {e}")
+                finally:
+                    self.tab_widget.blockSignals(False)
         
-        # Ahora procesar la nueva pestaña
+        # Procesar la nueva pestaña
         if index == 1:  # Decision Matrix tab
             if hasattr(self, 'matrix_tab'):
-                # Siempre recargar para asegurar sincronización
+                # Recargar datos para asegurar sincronización
+                QApplication.processEvents()
                 self.matrix_tab.load_matrix_data()
                 
         elif index == 2:  # Method Selection tab
             if hasattr(self, 'method_tab'):
-                # CORRECCIÓN: Solo llamar check_matrix_status UNA vez
-                # Eliminar la llamada duplicada
-                self.method_tab.refresh_on_tab_change()
-                # NO llamar check_matrix_status() aquí porque refresh_on_tab_change ya lo hace
+                # Esperar antes de verificar
+                QApplication.processEvents()
+                import time
+                time.sleep(0.2)
+                self.method_tab.check_matrix_status()
                 
         elif index == 3:  # Results tab
             if hasattr(self, 'results_tab'):

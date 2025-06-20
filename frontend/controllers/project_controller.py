@@ -75,17 +75,20 @@ class ProjectController:
         )
 
     def save_current_project(self):
-        """Save current project immediately"""
+        """Force save current project to ensure persistence"""
         if not self.current_project_id:
             return False
         
         try:
-            # Obtener el proyecto actual del API
-            project_data = self.api_client.get_project(self.current_project_id)
-            if project_data:
-                # Guardar inmediatamente
-                return self.api_client.update_project(self.current_project_id, project_data)
-            return False
+            # Obtener el proyecto actual
+            project = self.get_current_project()
+            if project:
+                # Actualizar timestamp
+                import datetime
+                project['updated_at'] = datetime.datetime.now().isoformat()
+                
+                # Guardar
+                return self.api_client.update_project(self.current_project_id, project)
         except Exception as e:
             logger.error(f"Error saving current project: {e}")
             return False
@@ -139,24 +142,25 @@ class ProjectController:
             # Obtener datos del API
             matrix_data = self.api_client.get_decision_matrix(self.current_project_id)
             
-            # Si no hay datos, devolver estructura vacía consistente
-            if not matrix_data or (not matrix_data.get('matrix_data') and not matrix_data.get('alternatives')):
-                # Intentar construir la estructura desde el proyecto
-                alternatives = self.get_alternatives()
-                criteria = self.get_criteria()
-                
-                return {
-                    'alternatives': alternatives,
-                    'criteria': criteria,
+            # Log para debug
+            logger.info(f"Got matrix data from API: {matrix_data.keys()}")
+            if 'criteria_config' in matrix_data:
+                logger.info(f"Config keys: {list(matrix_data['criteria_config'].keys())}")
+            
+            # Asegurar estructura completa
+            if not matrix_data:
+                matrix_data = {
+                    'alternatives': self.get_alternatives(),
+                    'criteria': self.get_criteria(),
                     'matrix_data': {},
                     'criteria_config': {}
                 }
             
-            # Asegurar que la estructura sea consistente
-            if 'alternatives' not in matrix_data:
-                matrix_data['alternatives'] = self.get_alternatives()
-            if 'criteria' not in matrix_data:
-                matrix_data['criteria'] = self.get_criteria()
+            # Asegurar que todos los campos existen
+            matrix_data.setdefault('alternatives', self.get_alternatives())
+            matrix_data.setdefault('criteria', self.get_criteria())
+            matrix_data.setdefault('matrix_data', {})
+            matrix_data.setdefault('criteria_config', {})
             
             return matrix_data
             
@@ -198,15 +202,48 @@ class ProjectController:
             # Extraer componentes
             matrix_data = complete_data.get('matrix_data', {})
             criteria_config = complete_data.get('criteria_config', {})
+            alternatives = complete_data.get('alternatives', [])
+            criteria = complete_data.get('criteria', [])
             
-            # Guardar usando el método existente
-            return self.api_client.save_decision_matrix(
-                self.current_project_id, 
-                matrix_data, 
+            # Log para debug
+            logger.info(f"Saving matrix - Data keys: {len(matrix_data)}, Config keys: {len(criteria_config)}")
+            
+            # IMPORTANTE: Primero guardar las alternativas y criterios
+            if alternatives or criteria:
+                success = self.api_client.save_project_complete(
+                    self.current_project_id,
+                    alternatives=alternatives,
+                    criteria=criteria
+                )
+                if not success:
+                    logger.error("Failed to save project structure")
+                    return False
+            
+            # Esperar un momento para asegurar sincronización
+            import time
+            time.sleep(0.2)
+            
+            # Luego guardar la matriz con configuración
+            success = self.api_client.save_decision_matrix(
+                self.current_project_id,
+                matrix_data,
                 criteria_config
             )
+            
+            if success:
+                logger.info("Matrix saved successfully")
+                # Forzar guardado del proyecto completo
+                time.sleep(0.1)
+                self.save_current_project()
+                return True
+            else:
+                logger.error("Failed to save matrix data")
+                return False
+                
         except Exception as e:
-            logger.error(f"Error saving complete decision matrix: {e}")
+            logger.error(f"Error in save_decision_matrix_complete: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def create_decision_matrix(self, name=None, values=None):

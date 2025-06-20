@@ -169,27 +169,8 @@ class Project:
         
         raise ValueError(f"No criteria were found with the ID: {criteria_id}")
     
-    def create_decision_matrix(self, name: Optional[str] = None,
-                               values: Optional[Union[np.ndarray, List[List[float]]]] = None) -> DecisionMatrix:
-        if not self._alternatives:
-            raise ValueError("There are no alternatives defined in the project")
-        if not self._criteria:
-            raise ValueError("There are no criterian defined in the project")
-        
-        matrix_name = name if name else f"Matriz de {self._name}"
-        self._decision_matrix = DecisionMatrix(
-            name=matrix_name,
-            alternatives=self._alternatives,
-            criteria=self._criteria,
-            values=values
-        )
-
-        self._updated_at = datetime.now()
-        return self._decision_matrix
-    
     def create_decision_matrix(self) -> None:
         """Crear matriz de decisión con alternativas y criterios actuales"""
-        from domain.entities.decision_matrix import DecisionMatrix
         
         if not self.alternatives or not self.criteria:
             raise ValueError("Cannot create matrix without alternatives and criteria")
