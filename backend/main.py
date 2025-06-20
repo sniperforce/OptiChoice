@@ -425,17 +425,68 @@ def execute_method(project_id, method_name):
     try:
         controller.load_project(project_id)
         
-        data = request.json
+        # Validar que el proyecto tenga datos antes de ejecutar
+        project = controller.current_project
+        if not project:
+            return jsonify({'error': 'Project not found'}), 404
+        
+        # Verificar matriz de decisión
+        if not project.decision_matrix:
+            return jsonify({
+                'error': 'No decision matrix found',
+                'details': 'Please configure the decision matrix before executing methods'
+            }), 400
+        
+        # Verificar que la matriz tenga valores
+        matrix_data = project.decision_matrix.get_values()
+        if matrix_data.size == 0:
+            return jsonify({
+                'error': 'Decision matrix is empty',
+                'details': 'Please enter values in the decision matrix'
+            }), 400
+        
+        data = request.json or {}
+        
+        # Log para debugging
+        print(f"Executing {method_name} with parameters: {data.get('parameters', {})}")
+        print(f"Matrix shape: {matrix_data.shape}")
+        print(f"Alternatives: {len(project.decision_matrix.alternatives)}")
+        print(f"Criteria: {len(project.decision_matrix.criteria)}")
+        
         result = controller.execute_method(
             method_name=method_name,
             parameters=data.get('parameters')
         )
         
+        if not result:
+            return jsonify({
+                'error': f'Method {method_name} returned no result',
+                'details': 'The method execution failed to produce results'
+            }), 500
+        
         controller.save_project()
         
-        return jsonify(result)
+        # Asegurar que el resultado incluya toda la información necesaria
+        if 'method_name' not in result:
+            result['method_name'] = method_name
+        
+        return jsonify(result), 200
+        
+    except ValueError as e:
+        return jsonify({
+            'error': str(e),
+            'method': method_name,
+            'project_id': project_id
+        }), 400
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Error executing method {method_name}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': 'Internal server error',
+            'details': str(e),
+            'method': method_name
+        }), 500
 
 @app.route('/api/projects/<project_id>/methods/execute-all', methods=['POST'])
 def execute_all_methods(project_id):

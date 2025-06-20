@@ -40,7 +40,7 @@ class TOPSISMethod(MCDMMethodInterface):
         return True
     
     def execute(self, decision_matrix: DecisionMatrix, 
-                parameters: Optional[Dict[str, Any]] = None) -> Result:
+            parameters: Optional[Dict[str, Any]] = None) -> Result:
         """Ejecutar el método TOPSIS"""
         try:
             # Preparar parámetros
@@ -52,71 +52,111 @@ class TOPSISMethod(MCDMMethodInterface):
             criteria = decision_matrix.criteria
             alternatives = decision_matrix.alternatives
             
-            # Verificar que la matriz no esté vacía
+            # Validaciones exhaustivas
             if matrix.size == 0:
                 raise MethodError("Empty decision matrix", self.name)
             
+            if len(alternatives) == 0:
+                raise MethodError("No alternatives in decision matrix", self.name)
+            
+            if len(criteria) == 0:
+                raise MethodError("No criteria in decision matrix", self.name)
+            
+            if matrix.shape[0] != len(alternatives):
+                raise MethodError(
+                    f"Matrix rows ({matrix.shape[0]}) don't match alternatives ({len(alternatives)})", 
+                    self.name
+                )
+            
+            if matrix.shape[1] != len(criteria):
+                raise MethodError(
+                    f"Matrix columns ({matrix.shape[1]}) don't match criteria ({len(criteria)})", 
+                    self.name
+                )
+            
+            # Verificar que no haya valores NaN o infinitos
+            if np.any(np.isnan(matrix)):
+                raise MethodError("Matrix contains NaN values", self.name)
+            
+            if np.any(np.isinf(matrix)):
+                raise MethodError("Matrix contains infinite values", self.name)
+            
+            # Verificar que los pesos sean válidos
+            if len(weights) != len(criteria):
+                raise MethodError(
+                    f"Number of weights ({len(weights)}) doesn't match criteria ({len(criteria)})", 
+                    self.name
+                )
+            
+            if np.sum(weights) == 0:
+                raise MethodError("Sum of weights is zero", self.name)
+            
+            # Normalizar pesos si no suman 1
+            if not np.isclose(np.sum(weights), 1.0):
+                weights = weights / np.sum(weights)
+            
+            # Log para debugging
+            print(f"TOPSIS - Matrix shape: {matrix.shape}")
+            print(f"TOPSIS - Weights: {weights}")
+            print(f"TOPSIS - Normalization method: {params['normalization_method']}")
+            
             # Normalizar la matriz
-            normalized_matrix = normalize_matrix(
-                matrix, 
-                method=params['normalization_method']
-            )
+            normalized_matrix = normalize_matrix(matrix, method=params['normalization_method'])
             
             # Aplicar pesos
             weighted_matrix = normalized_matrix * weights
             
-            # Determinar solución ideal y nadir
-            ideal_solution = np.zeros(len(criteria))
-            nadir_solution = np.zeros(len(criteria))
+            # Determinar soluciones ideales
+            ideal_positive = np.zeros(len(criteria))
+            ideal_negative = np.zeros(len(criteria))
             
             for j, criterion in enumerate(criteria):
-                col = weighted_matrix[:, j]
                 if criterion.optimization_type == OptimizationType.MAXIMIZE:
-                    ideal_solution[j] = np.max(col)
-                    nadir_solution[j] = np.min(col)
-                else:  # MINIMIZE
-                    ideal_solution[j] = np.min(col)
-                    nadir_solution[j] = np.max(col)
+                    ideal_positive[j] = np.max(weighted_matrix[:, j])
+                    ideal_negative[j] = np.min(weighted_matrix[:, j])
+                else:
+                    ideal_positive[j] = np.min(weighted_matrix[:, j])
+                    ideal_negative[j] = np.max(weighted_matrix[:, j])
             
             # Calcular distancias
-            n_alternatives = len(alternatives)
-            distances_to_ideal = np.zeros(n_alternatives)
-            distances_to_nadir = np.zeros(n_alternatives)
+            distances_positive = np.sqrt(np.sum((weighted_matrix - ideal_positive) ** 2, axis=1))
+            distances_negative = np.sqrt(np.sum((weighted_matrix - ideal_negative) ** 2, axis=1))
             
-            for i in range(n_alternatives):
-                distances_to_ideal[i] = np.sqrt(
-                    np.sum((weighted_matrix[i] - ideal_solution) ** 2)
-                )
-                distances_to_nadir[i] = np.sqrt(
-                    np.sum((weighted_matrix[i] - nadir_solution) ** 2)
-                )
-            
-            # Calcular coeficientes de cercanía
+            # Calcular proximidad relativa
             # Evitar división por cero
-            total_distances = distances_to_ideal + distances_to_nadir
-            total_distances[total_distances == 0] = 1e-10
+            denominator = distances_positive + distances_negative
+            scores = np.where(
+                denominator > 0,
+                distances_negative / denominator,
+                0.0
+            )
             
-            closeness_coefficients = distances_to_nadir / total_distances
+            # Calcular rankings
+            rankings = len(scores) - np.argsort(np.argsort(scores))
             
             # Crear resultado
             result = Result(
                 method_name=self.name,
-                alternative_ids=[alt.id for alt in alternatives],
-                alternative_names=[alt.name for alt in alternatives],
-                scores=closeness_coefficients,
-                parameters=params,
-                metadata={
-                    'ideal_solution': ideal_solution.tolist(),
-                    'nadir_solution': nadir_solution.tolist(),
-                    'distances_to_ideal': distances_to_ideal.tolist(),
-                    'distances_to_nadir': distances_to_nadir.tolist()
-                }
+                alternatives=alternatives,
+                scores=scores,
+                rankings=rankings,
+                parameters=params
             )
+            
+            # Agregar metadatos
+            result.set_metadata('normalized_matrix', normalized_matrix.tolist())
+            result.set_metadata('weighted_matrix', weighted_matrix.tolist())
+            result.set_metadata('ideal_positive', ideal_positive.tolist())
+            result.set_metadata('ideal_negative', ideal_negative.tolist())
+            result.set_metadata('distances_positive', distances_positive.tolist())
+            result.set_metadata('distances_negative', distances_negative.tolist())
             
             return result
             
+        except MethodError:
+            raise
         except Exception as e:
             raise MethodError(
-                f"Error executing TOPSIS: {str(e)}", 
+                f"Unexpected error in TOPSIS execution: {str(e)}",
                 self.name
-            )
+            ) from e

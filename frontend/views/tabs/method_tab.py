@@ -986,8 +986,8 @@ class MethodTab(QWidget):
             
             # Obtener parámetros del método
             params = {}
-            if method_name in self.method_parameters:
-                params = self.method_parameters[method_name]
+            if method_name in self.method_configs:
+                params = self.method_configs[method_name].get_parameters()
             
             # Crear progress dialog
             progress = QProgressDialog(f"Executing {method_name}...", "Cancel", 0, 100, self)
@@ -995,8 +995,8 @@ class MethodTab(QWidget):
             progress.show()
             
             # Ejecutar método
-            self.method_executor.setup([method_name], {method_name: params})
-            self.method_executor.start()
+            self.methods_executed.setup([method_name], {method_name: params})
+            self.methods_executed.start()
             
             progress.setValue(100)
             progress.close()

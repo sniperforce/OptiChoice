@@ -10,24 +10,61 @@ from typing import List, Optional, Union
 import numpy as np
 from domain.entities.criteria import Criteria
 
-def normalize_matrix(values: np.ndarray, criteria: List[Criteria], 
-                     method: str = 'minimax') -> np.ndarray:
-    #Validate the method
-    valid_methods = ['minimax', 'sum', 'max', 'vector']
-    if method not in valid_methods:
-        raise ValueError(f"Method of normalization not valid: {method}. Valid options {', '.join(valid_methods)}")
+def normalize_matrix(matrix: np.ndarray, method: str = 'vector', 
+                    criteria_types: Optional[List] = None) -> np.ndarray:
+    """
+    Normalize a decision matrix using different methods
+    """
+    # Validar entrada
+    if matrix.size == 0:
+        raise ValueError("Cannot normalize empty matrix")
     
-    normalized = values.copy()
-
-    #Apply the corresponding method
-    if method == 'minimax':
-        normalized = normalize_minmax(normalized, criteria)
-    elif method == 'sum':
-        normalized = normalize_sum(normalized, criteria)
-    elif method == 'max':
-        normalized = normalize_max(normalized, criteria)
-    elif method == 'vector':
-        normalized = normalize_vector(normalized, criteria)
+    if np.any(np.isnan(matrix)):
+        raise ValueError("Matrix contains NaN values")
+    
+    if np.any(np.isinf(matrix)):
+        raise ValueError("Matrix contains infinite values")
+    
+    normalized = matrix.copy().astype(float)
+    
+    if method == 'vector':
+        # Vector normalization
+        for j in range(matrix.shape[1]):
+            column_sum_sq = np.sum(matrix[:, j] ** 2)
+            if column_sum_sq > 0:
+                normalized[:, j] = matrix[:, j] / np.sqrt(column_sum_sq)
+            else:
+                # Si toda la columna es cero, mantenerla como cero
+                normalized[:, j] = 0.0
+                
+    elif method == 'minmax':
+        # Min-Max normalization
+        for j in range(matrix.shape[1]):
+            min_val = np.min(matrix[:, j])
+            max_val = np.max(matrix[:, j])
+            
+            if max_val > min_val:
+                if criteria_types and criteria_types[j] == 'minimize':
+                    # Para criterios de minimización
+                    normalized[:, j] = (max_val - matrix[:, j]) / (max_val - min_val)
+                else:
+                    # Para criterios de maximización
+                    normalized[:, j] = (matrix[:, j] - min_val) / (max_val - min_val)
+            else:
+                # Si todos los valores son iguales
+                normalized[:, j] = 1.0
+                
+    elif method == 'linear':
+        # Linear normalization
+        for j in range(matrix.shape[1]):
+            max_val = np.max(matrix[:, j])
+            if max_val > 0:
+                normalized[:, j] = matrix[:, j] / max_val
+            else:
+                normalized[:, j] = 0.0
+    
+    else:
+        raise ValueError(f"Unknown normalization method: {method}")
     
     return normalized
 

@@ -410,17 +410,57 @@ class MainController:
         return methods_info
     
     def execute_method(self, method_name: str, 
-                     parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                 parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         if self._current_project is None:
             raise ValueError("There is no current project")
         
-        result = self._decision_service.execute_method(
-            project=self._current_project,
-            method_name=method_name,
-            parameters=parameters
-        )
+        # Validar que exista una matriz de decisión
+        if self._current_project.decision_matrix is None:
+            raise ValueError("The project has no decision matrix configured")
         
-        return self._format_result(result)
+        # Validar que la matriz tenga datos
+        matrix = self._current_project.decision_matrix
+        if matrix.get_matrix().size == 0:
+            raise ValueError("The decision matrix is empty")
+        
+        # Validar que haya alternativas y criterios
+        if len(matrix.alternatives) == 0:
+            raise ValueError("No alternatives defined in the decision matrix")
+        
+        if len(matrix.criteria) == 0:
+            raise ValueError("No criteria defined in the decision matrix")
+        
+        try:
+            result = self._decision_service.execute_method(
+                project=self._current_project,
+                method_name=method_name,
+                parameters=parameters
+            )
+            
+            # Asegurar que el resultado sea válido antes de formatearlo
+            if result is None:
+                raise ValueError(f"Method {method_name} returned no result")
+            
+            formatted_result = self._format_result(result)
+            
+            # Agregar información adicional para debugging
+            formatted_result['matrix_info'] = {
+                'n_alternatives': len(matrix.alternatives),
+                'n_criteria': len(matrix.criteria),
+                'has_values': matrix.get_matrix().size > 0
+            }
+            
+            return formatted_result
+            
+        except ServiceError as e:
+            # Log detallado del error
+            print(f"ServiceError executing {method_name}: {e.message}")
+            raise ValueError(f"Error executing {method_name}: {e.message}")
+        except Exception as e:
+            # Log completo del error
+            import traceback
+            traceback.print_exc()
+            raise ValueError(f"Unexpected error executing {method_name}: {str(e)}")
     
     def execute_all_methods(self, 
                          parameters: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, Dict[str, Any]]:

@@ -37,19 +37,54 @@ class DecisionService:
             ) from e
     
     def execute_method(self, project: Project, method_name: str, 
-                     parameters: Optional[Dict[str, Any]] = None) -> Result:
+                 parameters: Optional[Dict[str, Any]] = None) -> Result:
         try:
+            # Validación exhaustiva del proyecto
             if project.decision_matrix is None:
                 raise ServiceError(
                     message="The project has no decision matrix",
                     service_name="DecisionService"
                 )
+            
+            # Validar que la matriz tenga datos
+            matrix = project.decision_matrix.get_matrix()
+            if matrix.size == 0:
+                raise ServiceError(
+                    message="The decision matrix is empty - no values to process",
+                    service_name="DecisionService"
+                )
+            
+            # Validar alternativas y criterios
+            if len(project.decision_matrix.alternatives) == 0:
+                raise ServiceError(
+                    message="No alternatives defined in the project",
+                    service_name="DecisionService"
+                )
+            
+            if len(project.decision_matrix.criteria) == 0:
+                raise ServiceError(
+                    message="No criteria defined in the project",
+                    service_name="DecisionService"
+                )
+            
+            # Log para debugging
+            print(f"DecisionService - Executing {method_name}")
+            print(f"DecisionService - Matrix shape: {matrix.shape}")
+            print(f"DecisionService - Parameters: {parameters}")
+            
+            # Crear método usando create_method_with_params
             method = self._method_factory.create_method_with_params(method_name, parameters)
             
             # Execute method and measure time
             start_time = time.time()
             result = method.execute(project.decision_matrix, parameters)
             execution_time = time.time() - start_time
+            
+            if result is None:
+                raise ServiceError(
+                    message=f"Method {method_name} returned None",
+                    service_name="DecisionService"
+                )
             
             # Update execution time
             result.set_metadata('execution_time', execution_time)
@@ -60,11 +95,15 @@ class DecisionService:
             return result
             
         except (ValidationError, MethodError) as e:
+            print(f"DecisionService - Method error: {e.message}")
             raise ServiceError(
                 message=f"Error executing method {method_name}: {e.message}",
                 service_name="DecisionService"
             ) from e
         except Exception as e:
+            print(f"DecisionService - Unexpected error: {str(e)}")
+            import traceback
+            traceback.print_exc()
             raise ServiceError(
                 message=f"Unexpected error executing method {method_name}: {str(e)}",
                 service_name="DecisionService"

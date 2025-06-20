@@ -345,6 +345,32 @@ class ConsensusAnalysisWidget(QWidget):
             'correlations': correlations
         }
     
+    def calculate_kendalls_w(rankings):
+        """Calculate Kendall's W coefficient of concordance"""
+        if len(rankings) == 0:
+            return 0.0
+        
+        rankings = np.array(rankings)
+        n_methods, n_items = rankings.shape
+        
+        if n_methods <= 1 or n_items <= 1:
+            return 0.0
+        
+        # Calculate sum of squared deviations
+        rank_sums = np.sum(rankings, axis=0)
+        mean_rank = np.mean(rank_sums)
+        s = np.sum((rank_sums - mean_rank) ** 2)
+        
+        # Kendall's W formula
+        # Evitar división por cero
+        denominator = n_methods ** 2 * (n_items ** 3 - n_items)
+        if denominator == 0:
+            return 0.0
+        
+        kendalls_w = (12 * s) / denominator
+        
+        return kendalls_w
+
     def create_correlation_table(self, correlations: Dict[str, float]) -> QTableWidget:
         """Crear tabla de correlaciones"""
         table = QTableWidget()
