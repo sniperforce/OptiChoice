@@ -8,8 +8,9 @@ from PyQt5.QtWidgets import (
     QCheckBox, QLineEdit, QFrame, QScrollArea, QGridLayout,
     QFileDialog, QProgressDialog
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QAbstractTableModel, QModelIndex, QVariant
+from PyQt5.QtCore import pyqtSignal, QAbstractTableModel, QModelIndex, QVariant
 from PyQt5.QtGui import QFont, QColor, QBrush
+from PyQt5.QtCore import Qt
 
 # Importaciones estándar de Python
 import json
@@ -526,7 +527,7 @@ class ResultsTab(QWidget):
         export_frame = QFrame()
         export_frame.setStyleSheet("""
             QFrame {
-                background-color: #f5f5f5;
+                background-color: #f9f9f9;
                 border: 1px solid #ddd;
                 border-radius: 5px;
                 padding: 10px;
@@ -535,27 +536,125 @@ class ResultsTab(QWidget):
         export_layout = QHBoxLayout(export_frame)
         
         export_label = QLabel("Export Results:")
+        export_label.setFont(QFont("Arial", 10, QFont.Bold))
         export_layout.addWidget(export_label)
         
-        self.export_excel_btn = QPushButton("📊 Excel")
-        self.export_excel_btn.clicked.connect(lambda: self.export_results('excel'))
-        export_layout.addWidget(self.export_excel_btn)
+        self.export_format = QComboBox()
+        self.export_format.addItems(["PDF Report", "Excel", "CSV", "JSON"])
+        export_layout.addWidget(self.export_format)
         
-        self.export_csv_btn = QPushButton("📄 CSV")
-        self.export_csv_btn.clicked.connect(lambda: self.export_results('csv'))
-        export_layout.addWidget(self.export_csv_btn)
-        
-        self.export_json_btn = QPushButton("📋 JSON")
-        self.export_json_btn.clicked.connect(lambda: self.export_results('json'))
-        export_layout.addWidget(self.export_json_btn)
-        
-        self.print_btn = QPushButton("🖨️ Print")
-        self.print_btn.clicked.connect(self.print_results)
-        export_layout.addWidget(self.print_btn)
+        self.export_btn = QPushButton("📥 Export")
+        self.export_btn.clicked.connect(self.export_results_handler)
+        export_layout.addWidget(self.export_btn)
         
         export_layout.addStretch()
+        
         parent_layout.addWidget(export_frame)
     
+    def export_results_handler(self):
+        """Manejar exportación de resultados"""
+        format_type = self.export_format.currentText()
+        
+        if not self.results_data:
+            QMessageBox.warning(self, "No Data", "No results to export")
+            return
+        
+        # Mapear formato a extensión
+        ext_map = {
+            "PDF Report": ".pdf",
+            "Excel": ".xlsx", 
+            "CSV": ".csv",
+            "JSON": ".json"
+        }
+        
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Results",
+            f"mcdm_results{ext_map[format_type]}",
+            f"{format_type} Files (*{ext_map[format_type]})"
+        )
+        
+        if file_path:
+            try:
+                if format_type == "JSON":
+                    self.export_json(file_path)
+                elif format_type == "CSV":
+                    self.export_csv(file_path)
+                elif format_type == "Excel":
+                    self.export_excel(file_path)
+                elif format_type == "PDF Report":
+                    self.export_pdf(file_path)
+                    
+                QMessageBox.information(self, "Success", f"Results exported to {file_path}")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Export Error", str(e))
+
+    def export_json(self, file_path: str):
+        """Exportar resultados a JSON"""
+        with open(file_path, 'w') as f:
+            json.dump(self.results_data, f, indent=2)
+
+    def export_csv(self, file_path: str):
+        """Exportar resultados a CSV"""
+        if not self.results_data:
+            return
+        
+        # Preparar datos para CSV
+        rows = []
+        headers = ["Alternative", "Method", "Score", "Ranking"]
+        
+        for method_name, result in self.results_data.items():
+            for alt in result.get('alternatives', []):
+                rows.append([
+                    alt['name'],
+                    method_name,
+                    alt['score'],
+                    alt['ranking']
+                ])
+        
+        # Escribir CSV
+        with open(file_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            writer.writerows(rows)
+
+    def export_excel(self, file_path: str):
+        """Exportar resultados a Excel"""
+        try:
+            import pandas as pd
+            
+            # Crear hojas para cada método
+            with pd.ExcelWriter(file_path) as writer:
+                # Hoja de resumen
+                summary_data = []
+                for method_name, result in self.results_data.items():
+                    best_alt = result.get('best_alternative', {})
+                    summary_data.append({
+                        'Method': method_name,
+                        'Best Alternative': best_alt.get('name', ''),
+                        'Score': best_alt.get('score', ''),
+                        'Execution Time': result.get('execution_time', 0)
+                    })
+                
+                pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
+                
+                # Hoja para cada método
+                for method_name, result in self.results_data.items():
+                    df = pd.DataFrame(result.get('alternatives', []))
+                    df.to_excel(writer, sheet_name=method_name, index=False)
+                    
+        except ImportError:
+            QMessageBox.error(self, "Error", "pandas library required for Excel export")
+
+    def export_pdf(self, file_path: str):
+        """Exportar resultados a PDF (implementación básica)"""
+        QMessageBox.information(self, "PDF Export", 
+                            "PDF export requires additional libraries. "
+                            "Using alternative format.")
+        # Por ahora, exportar como JSON
+        self.export_json(file_path.replace('.pdf', '.json'))
+
     def load_results(self):
         """Cargar y mostrar resultados de archivos guardados"""
         try:

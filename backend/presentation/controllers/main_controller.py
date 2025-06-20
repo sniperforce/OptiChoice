@@ -269,21 +269,30 @@ class MainController:
         except ValueError as e:
             raise ValueError(f"Error removing criterion: {str(e)}")
     
-    def get_decision_matrix(self) -> Dict[str, Any]:
-        """Get the decision matrix for the current project"""
+    def get_decision_matrix(self) -> Optional[Dict[str, Any]]:
+        """Obtener la matriz de decisión del proyecto actual"""
         if self._current_project is None:
             raise ValueError("There is no current project")
-
+        
         if self._current_project.decision_matrix is None:
             raise ValueError("The project has no decision matrix")
         
         matrix = self._current_project.decision_matrix
-
-        result = {
-            'name': matrix.name,
-            'shape': matrix.shape,
+        
+        # Formatear los datos de la matriz
+        matrix_data = {}
+        for i, alt in enumerate(matrix.alternative):
+            for j, crit in enumerate(matrix.criteria):
+                key = f"{alt.id}_{crit.id}"
+                try:
+                    value = matrix.get_value(i, j)
+                    matrix_data[key] = str(value) if value is not None else ""
+                except:
+                    matrix_data[key] = ""
+        
+        return {
             'alternatives': [
-                {'id': alt.id, 'name': alt.name}
+                {'id': alt.id, 'name': alt.name} 
                 for alt in matrix.alternative
             ],
             'criteria': [
@@ -292,24 +301,11 @@ class MainController:
                     'name': crit.name,
                     'optimization_type': crit.optimization_type.value,
                     'weight': crit.weight
-                }
+                } 
                 for crit in matrix.criteria
             ],
-            'values': matrix.values.tolist(),
-            'matrix_data': {},  # Will be populated with actual data
-            'criteria_config': {}  # Will be populated with config
+            'matrix_data': matrix_data
         }
-        
-        # Extract matrix data in the format expected by frontend
-        matrix_data = {}
-        for i, alt in enumerate(matrix.alternative):
-            for j, crit in enumerate(matrix.criteria):
-                key = f"{alt.id}_{crit.id}"
-                matrix_data[key] = str(matrix.values[i, j])
-        
-        result['matrix_data'] = matrix_data
-        
-        return result
 
     def create_decision_matrix(self, name: Optional[str] = None, 
                          values: Optional[List[List[float]]] = None) -> Dict[str, Any]:
@@ -331,21 +327,43 @@ class MainController:
             'has_values': matrix.values.size > 0
         }
     
-    def set_matrix_value(self, alternative_id: str, criteria_id: str, value: float) -> None:
-        """Set a specific value in the decision matrix"""
+    def create_decision_matrix(self) -> None:
+        """Crear matriz de decisión vacía para el proyecto actual"""
         if self._current_project is None:
             raise ValueError("There is no current project")
         
-        # Create matrix if it doesn't exist
-        if self._current_project.decision_matrix is None:
-            self.create_decision_matrix()
+        # Crear matriz con las alternativas y criterios actuales
+        self._current_project.create_decision_matrix()
+    
+    def set_matrix_value(self, alternative_id: str, criteria_id: str, value: float) -> None:
+        """Establecer un valor específico en la matriz"""
+        if self._current_project is None:
+            raise ValueError("There is no current project")
         
-        self._decision_service.set_matrix_value(
-            project=self._current_project,
-            alternative_id=alternative_id,
-            criteria_id=criteria_id,
-            value=value
-        )
+        if self._current_project.decision_matrix is None:
+            self._current_project.create_decision_matrix()
+        
+        matrix = self._current_project.decision_matrix
+        
+        # Encontrar índices
+        alt_idx = None
+        crit_idx = None
+        
+        for i, alt in enumerate(matrix.alternative):
+            if alt.id == alternative_id:
+                alt_idx = i
+                break
+        
+        for j, crit in enumerate(matrix.criteria):
+            if crit.id == criteria_id:
+                crit_idx = j
+                break
+        
+        if alt_idx is not None and crit_idx is not None:
+            matrix.set_values(alt_idx, crit_idx, value)
+        else:
+            raise ValueError(f"Alternative {alternative_id} or criteria {criteria_id} not found")
+
     
     def save_decision_matrix(self, matrix_data: Dict[str, str], criteria_config: Dict[str, Dict]) -> bool:
         """Save decision matrix data and configuration"""

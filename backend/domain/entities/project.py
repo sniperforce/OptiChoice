@@ -187,6 +187,18 @@ class Project:
         self._updated_at = datetime.now()
         return self._decision_matrix
     
+    def create_decision_matrix(self) -> None:
+        """Crear matriz de decisión con alternativas y criterios actuales"""
+        from domain.entities.decision_matrix import DecisionMatrix
+        
+        if not self.alternatives or not self.criteria:
+            raise ValueError("Cannot create matrix without alternatives and criteria")
+        
+        self._decision_matrix = DecisionMatrix(
+            alternatives=self.alternatives,
+            criteria=self.criteria
+        )
+
     def set_decision_matrix(self, matrix: DecisionMatrix) -> None:
         matrix_alt_ids = {alt.id for alt in matrix.alternative}
         project_alt_ids = {alt.od for alt in self._alternatives}
@@ -202,7 +214,8 @@ class Project:
         self._decision_matrix = matrix
         self._updated_at = datetime.now()
     
-    def add_result(self, method_name: str, result: Result) -> None:
+    def add_result(self, method_name: str, result: 'Result') -> None:
+        """Agregar resultado de un método"""
         self._results[method_name] = result
         self._updated_at = datetime.now()
     
@@ -224,42 +237,49 @@ class Project:
             raise KeyError(f"There is no result for the method: {method_name}")
         return self._results[method_name].get_best_alternative()
     
-    def compare_methods(self, method_names: List[str]) -> Dict[str, Any]:
-        # Verify that all the methods exist
-        for method in method_names:
-            if method not in self._results:
-                raise KeyError(f"There is no result for the method: {method}")
+    def compare_methods(self, method_names: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Comparar resultados entre métodos"""
+        if not self._results:
+            return {}
         
-        comparison_data = {
-            'methods': method_names,
-            'alternatives': {},
-            'rankings_correlation': {},
-            'best_alternatives': {}
+        methods_to_compare = method_names or list(self._results.keys())
+        
+        # Preparar datos para comparación
+        comparison = {
+            'methods': methods_to_compare,
+            'correlation_matrix': {},
+            'ranking_comparison': {},
+            'consensus_measures': {}
         }
-
-        alt_ids = self._results[method_names[0]]._alternative_ids
-
-        for alt_id in alt_ids:
-            comparison_data['alternatives'][alt_id] = {}
-
-            for method in method_names:
-                result = self._results[method]
-                alt_name, alt_score, alt_rank = result.get_alternative_info(alt_id)
-                comparison_data['alternatives'][alt_id][method] = {
-                    'name': alt_name,
-                    'score': alt_score,
-                    'ranking': alt_rank
-                }
         
-        for method in method_names:
-            best_id, best_name, best_score = self._results[method].get_best_alternative()
-            comparison_data['best_alternatives'][method] = {
-                'id': best_id,
-                'name': best_name,
-                'score': best_score
-            }
-    
-        return comparison_data
+        # Comparar rankings
+        rankings = {}
+        for method in methods_to_compare:
+            if method in self._results:
+                result = self._results[method]
+                rankings[method] = result.rankings
+        
+        # Calcular correlaciones
+        if len(rankings) >= 2:
+            import numpy as np
+            from scipy.stats import spearmanr, kendalltau
+            
+            method_list = list(rankings.keys())
+            n_methods = len(method_list)
+            
+            # Matriz de correlación
+            corr_matrix = np.zeros((n_methods, n_methods))
+            
+            for i in range(n_methods):
+                for j in range(n_methods):
+                    rank1 = rankings[method_list[i]]
+                    rank2 = rankings[method_list[j]]
+                    corr, _ = spearmanr(rank1, rank2)
+                    corr_matrix[i, j] = corr
+            
+            comparison['correlation_matrix'] = corr_matrix.tolist()
+            
+        return comparison
     
     def to_dict(self) -> Dict[str, Any]:
         

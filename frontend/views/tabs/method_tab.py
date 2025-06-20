@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                             QDoubleSpinBox, QComboBox, QTableWidget, QTableWidgetItem,
                             QHeaderView, QMessageBox, QScrollArea, QFrame,
                             QGridLayout, QFormLayout, QTabWidget, QDialog,
-                            QDialogButtonBox, QRadioButton, QButtonGroup)
+                            QDialogButtonBox, QRadioButton, QButtonGroup, QProgressDialog)
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, QPropertyAnimation, QEasingCurve
 from PyQt5.QtGui import QFont, QColor, QPixmap, QIcon, QPalette
 from typing import Dict, List, Optional, Any, Tuple
@@ -934,19 +934,32 @@ class MethodTab(QWidget):
         dialog.exec_()
     
     def execute_single_method(self, method_name: str):
-        """Execute a single method"""
-        if not self.check_matrix_status():
-            return
-        
-        # Get parameters
-        params = {}
-        if method_name in self.method_configs:
-            params = self.method_configs[method_name].get_parameters()
-        
-        # Setup and run executor
-        self.set_execution_state(True)
-        self.executor.setup([method_name], {method_name: params})
-        self.executor.start()
+        """Ejecutar un método específico"""
+        try:
+            # Verificar estado de la matriz
+            if not self.check_matrix_status():
+                return
+            
+            # Obtener parámetros del método
+            params = {}
+            if method_name in self.method_parameters:
+                params = self.method_parameters[method_name]
+            
+            # Crear progress dialog
+            progress = QProgressDialog(f"Executing {method_name}...", "Cancel", 0, 100, self)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
+            
+            # Ejecutar método
+            self.method_executor.setup([method_name], {method_name: params})
+            self.method_executor.start()
+            
+            progress.setValue(100)
+            progress.close()
+            
+        except Exception as e:
+            logger.error(f"Error executing {method_name}: {e}")
+            QMessageBox.critical(self, "Execution Error", str(e))
     
     def execute_selected_methods(self):
         """Execute all selected methods"""
