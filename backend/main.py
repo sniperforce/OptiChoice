@@ -9,7 +9,8 @@ import os
 import json
 from flask import Flask, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
-
+from datetime import datetime
+import numpy as np
 from infrastructure.persistence.file_project_repository import FileProjectRepository
 from presentation.controllers.main_controller import MainController
 from utils.exceptions import ServiceError
@@ -355,12 +356,11 @@ def save_decision_matrix(project_id):
         
         # Save matrix data
         success = controller.save_decision_matrix(
-            matrix_data=data.get('matrix_data', {}),
-            criteria_config=data.get('criteria_config', {})
+            data.get('matrix_data', {}),
+            data.get('criteria_config', {})
         )
         
         if success:
-            # CORRECCIÓN: Forzar guardado completo del proyecto
             controller.save_project()
             
             # Verificar que se guardó correctamente
@@ -422,70 +422,123 @@ def get_methods():
 
 @app.route('/api/projects/<project_id>/methods/<method_name>/execute', methods=['POST'])
 def execute_method(project_id, method_name):
+    """Execute a specific MCDM method on a project"""
     try:
+        # Cargar el proyecto
         controller.load_project(project_id)
         
-        # Validar que el proyecto tenga datos antes de ejecutar
+        # Validar que el proyecto existe
         project = controller.current_project
         if not project:
-            return jsonify({'error': 'Project not found'}), 404
+            return jsonify({
+                'error': 'Project not found',
+                'project_id': project_id
+            }), 404
         
-        # Verificar matriz de decisión
+        # Verificar que existe una matriz de decisión
         if not project.decision_matrix:
             return jsonify({
                 'error': 'No decision matrix found',
                 'details': 'Please configure the decision matrix before executing methods'
             }), 400
         
-        # Verificar que la matriz tenga valores
-        matrix_data = project.decision_matrix.get_values()
-        if matrix_data.size == 0:
+        # Obtener los valores de la matriz
+        matrix_values = project.decision_matrix.values
+        
+        # Verificar que la matriz tiene el tamaño correcto
+        if matrix_values.size == 0:
             return jsonify({
                 'error': 'Decision matrix is empty',
-                'details': 'Please enter values in the decision matrix'
+                'details': 'The matrix has no data. Please add alternatives and criteria first.'
             }), 400
         
+        # Verificar que hay al menos un valor diferente de cero
+        if np.all(matrix_values == 0):
+            return jsonify({
+                'error': 'All matrix values are zero',
+                'details': 'Please enter non-zero values in the decision matrix'
+            }), 400
+        
+        # Contar valores no cero para información
+        non_zero_count = np.count_nonzero(matrix_values)
+        total_values = matrix_values.size
+        
+        # Warning si menos del 50% de los valores están llenos
+        if non_zero_count < total_values * 0.5:
+            print(f"Warning: Only {non_zero_count}/{total_values} values are non-zero in the matrix")
+        
+        # Obtener parámetros del request
         data = request.json or {}
+        parameters = data.get('parameters', {})
         
         # Log para debugging
-        print(f"Executing {method_name} with parameters: {data.get('parameters', {})}")
-        print(f"Matrix shape: {matrix_data.shape}")
-        print(f"Alternatives: {len(project.decision_matrix.alternatives)}")
-        print(f"Criteria: {len(project.decision_matrix.criteria)}")
+        print(f"Executing {method_name} on project {project_id}")
+        print(f"Matrix shape: {matrix_values.shape}")
+        print(f"Non-zero values: {non_zero_count}/{total_values}")
+        print(f"Parameters: {parameters}")
         
-        result = controller.execute_method(
-            method_name=method_name,
-            parameters=data.get('parameters')
-        )
+        # Ejecutar el método
+        try:
+            result = controller.execute_method(
+                method_name=method_name,
+                parameters=parameters
+            )
+        except ValueError as ve:
+            # Error específico del método o validación
+            return jsonify({
+                'error': str(ve),
+                'method': method_name,
+                'type': 'validation_error'
+            }), 400
+        except Exception as me:
+            # Error durante la ejecución del método
+            return jsonify({
+                'error': f'Method execution failed: {str(me)}',
+                'method': method_name,
+                'type': 'execution_error'
+            }), 500
         
+        # Validar el resultado
         if not result:
             return jsonify({
                 'error': f'Method {method_name} returned no result',
                 'details': 'The method execution failed to produce results'
             }), 500
         
-        controller.save_project()
+        # Guardar el proyecto con los resultados
+        try:
+            controller.save_project()
+        except Exception as se:
+            print(f"Warning: Failed to save project after method execution: {se}")
         
-        # Asegurar que el resultado incluya toda la información necesaria
-        if 'method_name' not in result:
-            result['method_name'] = method_name
+        # Asegurar que el resultado tenga la estructura correcta
+        if isinstance(result, dict):
+            # Agregar información básica si no está presente
+            result.setdefault('method_name', method_name)
+            result.setdefault('project_id', project_id)
+            result.setdefault('timestamp', datetime.now().isoformat())
+            
+            # Información de la matriz para debugging
+            result['matrix_info'] = {
+                'shape': list(matrix_values.shape),
+                'non_zero_values': int(non_zero_count),
+                'total_values': int(total_values),
+                'fill_percentage': round((non_zero_count / total_values) * 100, 2)
+            }
         
         return jsonify(result), 200
         
-    except ValueError as e:
-        return jsonify({
-            'error': str(e),
-            'method': method_name,
-            'project_id': project_id
-        }), 400
     except Exception as e:
-        print(f"Error executing method {method_name}: {str(e)}")
+        # Error inesperado
+        print(f"Unexpected error executing method {method_name}: {str(e)}")
         import traceback
         traceback.print_exc()
+        
         return jsonify({
             'error': 'Internal server error',
             'details': str(e),
-            'method': method_name
+            'method': method_name,
+            'type': 'unexpected_error'
         }), 500
 
 @app.route('/api/projects/<project_id>/methods/execute-all', methods=['POST'])

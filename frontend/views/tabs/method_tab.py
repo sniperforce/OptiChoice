@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                             QDoubleSpinBox, QComboBox, QTableWidget, QTableWidgetItem,
                             QHeaderView, QMessageBox, QScrollArea, QFrame,
                             QGridLayout, QFormLayout, QTabWidget, QDialog,
-                            QDialogButtonBox, QRadioButton, QButtonGroup, QProgressDialog)
+                            QDialogButtonBox, QRadioButton, QButtonGroup, QProgressDialog, QApplication)
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, QPropertyAnimation, QEasingCurve
 from PyQt5.QtGui import QFont, QColor, QPixmap, QIcon, QPalette
 from typing import Dict, List, Optional, Any, Tuple
@@ -64,8 +64,9 @@ class MethodExecutor(QThread):
                 # Small delay to show status
                 time.sleep(0.1)
                 
-                # Get parameters for this method
+                # Get parameters for this method - IMPORTANTE
                 params = self.parameters.get(method_name, {})
+                logger.info(f"Executing {method_name} with parameters: {params}")
                 
                 # Execute method
                 self.status_updated.emit(method_name, "Executing...")
@@ -74,7 +75,7 @@ class MethodExecutor(QThread):
                 # Start timing
                 start_time = time.time()
                 
-                # Call the controller method (IT ALREADY EXISTS!)
+                # Llamar al controlador con los parámetros
                 result = self.project_controller.execute_method(method_name, params)
                 
                 # Calculate execution time
@@ -118,6 +119,9 @@ class MethodExecutor(QThread):
                 results[method_name] = result
                 self.method_completed.emit(method_name, result)
                 
+                partial_results = {k: v for k, v in results.items()}
+                self.all_completed.emit(partial_results)
+
             except Exception as e:
                 error_msg = str(e)
                 logger.error(f"Error executing {method_name}: {error_msg}")
@@ -806,95 +810,95 @@ class MethodTab(QWidget):
         self.methods_container_layout.addWidget(card)
     
     def check_matrix_status(self) -> bool:
-        """Check if matrix is ready for methods - FIXED"""
+        """Check if matrix is ready for methods"""
         try:
             # Check if project is loaded
             if not self.project_controller.current_project_id:
                 self.matrix_status.setText("⚠️ No project loaded")
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
+                self.disable_all_methods("No project loaded")
                 return False
             
-            # CORRECCIÓN: Forzar recarga de datos del proyecto
+            # Forzar recarga de datos del proyecto
             self.project_controller.load_project(self.project_controller.current_project_id)
             
             # Get complete matrix data
             complete_data = self.project_controller.get_decision_matrix()
             
-            # Log para debug
-            logger.info(f"Method tab - Checking matrix status")
-            logger.info(f"Alternatives: {len(complete_data.get('alternatives', []))}")
-            logger.info(f"Criteria: {len(complete_data.get('criteria', []))}")
-            logger.info(f"Matrix values: {len(complete_data.get('matrix_data', {}))}")
-            
+            # Validaciones detalladas
             if not complete_data:
-                self.matrix_status.setText("⚠️ No decision matrix")
+                self.matrix_status.setText("⚠️ No matrix data")
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
+                self.disable_all_methods("No matrix data available")
                 return False
             
-            # Extraer componentes
-            matrix_data = complete_data.get('matrix_data', {})
             alternatives = complete_data.get('alternatives', [])
             criteria = complete_data.get('criteria', [])
+            matrix_values = complete_data.get('matrix_data', {})
             
-            # Verificar estructura
+            # Log para debug
+            logger.info(f"Matrix status check - Alternatives: {len(alternatives)}, Criteria: {len(criteria)}")
+            
+            # Validar estructura básica
             if not alternatives or not criteria:
-                self.matrix_status.setText("⚠️ No alternatives or criteria defined")
+                self.matrix_status.setText("⚠️ Missing alternatives or criteria")
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
+                self.disable_all_methods("Define alternatives and criteria first")
                 return False
             
-            # Calcular completitud
-            total_cells = len(alternatives) * len(criteria)
+            # Verificar si hay valores en la matriz
+            has_values = False
+            value_count = 0
+            for key, value in matrix_values.items():
+                try:
+                    float_val = float(value) if value not in [None, ''] else 0.0
+                    if float_val != 0.0:
+                        has_values = True
+                        value_count += 1
+                except:
+                    continue
             
-            if total_cells == 0:
-                self.matrix_status.setText("⚠️ Empty matrix structure")
+            if not has_values:
+                self.matrix_status.setText("⚠️ Matrix has no values")
                 self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
+                self.disable_all_methods("Enter values in the decision matrix")
                 return False
             
-            # CORRECCIÓN: Contar celdas llenas correctamente
-            filled_cells = 0
-            for alt in alternatives:
-                for crit in criteria:
-                    key = f"{alt['id']}_{crit['id']}"
-                    value = matrix_data.get(key, "")
-                    if value and str(value).strip() and str(value).strip() != "0":
-                        try:
-                            float(value)
-                            filled_cells += 1
-                        except ValueError:
-                            pass
+            # Todo está bien
+            self.matrix_status.setText(f"✓ Matrix ready ({len(alternatives)} × {len(criteria)}, {value_count} values)")
+            self.matrix_status.setStyleSheet("color: #4caf50; font-weight: bold;")
+            self.enable_all_methods()
+            return True
             
-            completeness = (filled_cells / total_cells) * 100
-            
-            logger.info(f"Matrix completeness: {completeness:.1f}% ({filled_cells}/{total_cells})")
-            
-            # Actualizar UI
-            if completeness < 100:
-                self.matrix_status.setText(f"⚠️ Matrix {completeness:.0f}% complete")
-                self.matrix_status.setStyleSheet("color: #ff9800; font-weight: bold;")
-                
-                if completeness < 50:
-                    reply = QMessageBox.question(
-                        self, 
-                        "Incomplete Matrix",
-                        f"Matrix is only {completeness:.0f}% complete. Continue anyway?",
-                        QMessageBox.Yes | QMessageBox.No
-                    )
-                    return reply == QMessageBox.Yes
-                else:
-                    return True
-            else:
-                self.matrix_status.setText("✅ Matrix ready (100% complete)")
-                self.matrix_status.setStyleSheet("color: #4CAF50; font-weight: bold;")
-                return True
-                
         except Exception as e:
             logger.error(f"Error checking matrix status: {e}")
-            import traceback
-            traceback.print_exc()
-            self.matrix_status.setText("❌ Error checking matrix")
+            self.matrix_status.setText("⚠️ Error checking matrix")
             self.matrix_status.setStyleSheet("color: #f44336; font-weight: bold;")
+            self.disable_all_methods("Error checking matrix status")
             return False
     
+    def disable_all_methods(self, reason: str):
+        """Disable all method cards with reason"""
+        for card in self.method_cards.values():
+            card.set_enabled(False)
+        
+        # Mostrar mensaje en el área de configuración
+        if self.current_config_widget:
+            self.config_scroll.takeWidget()
+            self.current_config_widget = None
+        
+        from PyQt5.QtWidgets import QLabel
+        from PyQt5.QtCore import Qt
+        info_label = QLabel(f"Methods disabled: {reason}")
+        info_label.setAlignment(Qt.AlignCenter)
+        info_label.setStyleSheet("color: #666; padding: 20px;")
+        self.config_scroll.setWidget(info_label)
+
+    def enable_all_methods(self):
+        """Enable all method cards"""
+        for card in self.method_cards.values():
+            card.set_enabled(True)
+
     def validate_matrix(self):
         """Validate matrix for MCDM execution"""
         if self.check_matrix_status():
@@ -978,32 +982,98 @@ class MethodTab(QWidget):
         dialog.exec_()
     
     def execute_single_method(self, method_name: str):
-        """Ejecutar un método específico"""
+        """Execute a single MCDM method with proper results integration"""
         try:
             # Verificar estado de la matriz
             if not self.check_matrix_status():
+                QMessageBox.warning(
+                    self, 
+                    "Matrix Not Ready", 
+                    "Please complete the decision matrix before executing methods."
+                )
                 return
             
-            # Obtener parámetros del método
+            # Obtener parámetros del método si están configurados
             params = {}
             if method_name in self.method_configs:
-                params = self.method_configs[method_name].get_parameters()
+                try:
+                    config_widget = self.method_configs[method_name]
+                    if config_widget and hasattr(config_widget, 'get_parameters'):
+                        params = config_widget.get_parameters()
+                        logger.info(f"Got parameters for {method_name}: {params}")
+                except RuntimeError:
+                    logger.warning(f"Config widget for {method_name} was deleted, using defaults")
+                    params = {}
             
             # Crear progress dialog
-            progress = QProgressDialog(f"Executing {method_name}...", "Cancel", 0, 100, self)
+            progress = QProgressDialog(
+                f"Executing {method_name}...", 
+                "Cancel", 
+                0, 100, 
+                self
+            )
+            progress.setWindowTitle("Method Execution")
             progress.setWindowModality(Qt.WindowModal)
+            progress.setMinimumDuration(0)
             progress.show()
             
-            # Ejecutar método
-            self.methods_executed.setup([method_name], {method_name: params})
-            self.methods_executed.start()
-            
-            progress.setValue(100)
-            progress.close()
-            
+            try:
+                # Actualizar progreso
+                progress.setValue(20)
+                QApplication.processEvents()
+                
+                # Ejecutar el método directamente (sin usar el thread)
+                result = self.project_controller.execute_method(method_name, params)
+                
+                progress.setValue(80)
+                QApplication.processEvents()
+                
+                if result:
+                    # Guardar en resultados locales
+                    self.method_results[method_name] = result
+                    
+                    # Actualizar la tabla local
+                    self.on_method_completed(method_name, result)
+                    
+                    # CRÍTICO: Emitir señal para actualizar results_tab
+                    single_result = {method_name: result}
+                    self.methods_executed.emit(single_result)
+                    
+                    progress.setValue(100)
+                    
+                    # Mostrar mensaje de éxito
+                    QMessageBox.information(
+                        self,
+                        "Success",
+                        f"{method_name} executed successfully!\n\n"
+                        f"Results have been saved and are available in the Results tab."
+                    )
+                else:
+                    raise Exception("Method execution returned no results")
+                    
+            except Exception as e:
+                logger.error(f"Error executing {method_name}: {e}")
+                QMessageBox.critical(
+                    self, 
+                    f"{method_name} Failed", 
+                    f"Error: {str(e)}"
+                )
+                
+                # Actualizar estado del card
+                if method_name in self.method_cards:
+                    card = self.method_cards[method_name]
+                    card.set_progress(0)
+                    card.set_status("Failed")
+            finally:
+                progress.close()
+                
         except Exception as e:
-            logger.error(f"Error executing {method_name}: {e}")
-            QMessageBox.critical(self, "Execution Error", str(e))
+            logger.error(f"Error in execute_single_method: {e}")
+            QMessageBox.critical(
+                self, 
+                "Execution Error", 
+                f"Failed to execute {method_name}:\n{str(e)}"
+            )
     
     def execute_selected_methods(self):
         """Execute all selected methods"""
@@ -1038,9 +1108,16 @@ class MethodTab(QWidget):
                         parameters[method_name] = {}
         
         if not selected_methods:
-            QMessageBox.warning(self, "No Selection", "Please select at least one method to execute.")
+            QMessageBox.warning(
+                self, 
+                "No Selection", 
+                "Please select at least one method to execute.\n\n"
+                "Click the checkbox next to each method you want to run."
+            )
             return
         
+        logger.info(f"Executing selected methods: {selected_methods}")
+
         # Confirm execution
         reply = QMessageBox.question(self, "Confirm Execution",
                                 f"Execute {len(selected_methods)} selected method(s)?",
@@ -1064,6 +1141,8 @@ class MethodTab(QWidget):
             if method_name in self.method_configs:
                 parameters[method_name] = self.method_configs[method_name].get_parameters()
         
+        logger.info(f"Executing all methods: {all_methods}")
+
         # Confirm execution
         reply = QMessageBox.question(self, "Confirm Execution",
                                    f"Execute all {len(all_methods)} methods?",

@@ -335,29 +335,67 @@ class MCDMApplication(QMainWindow):
             self.method_tab.check_matrix_status()
 
     def on_methods_executed(self, results):
-        """Handle methods execution completion"""
+        """Handle methods execution completion - Enhanced version"""
         try:
-            # IMPORTANTE: Guardar resultados en el proyecto antes de cambiar de pestaña
-            if self.project_controller.current_project_id and results:
-                project = self.project_controller.get_current_project()
-                if project:
-                    project['method_results'] = results
-                    self.project_controller.save_project(project)
+            if not results:
+                logger.warning("No results to display")
+                return
+                
+            # Log para debugging
+            logger.info(f"Received {len(results)} method results")
             
-            # Switch to results tab
+            # Guardar resultados en el proyecto
+            if self.project_controller.current_project_id:
+                try:
+                    # Obtener proyecto actual
+                    project = self.project_controller.get_current_project()
+                    if project:
+                        # Merge con resultados existentes si los hay
+                        existing_results = project.get('method_results', {})
+                        existing_results.update(results)
+                        project['method_results'] = existing_results
+                        
+                        # Guardar proyecto
+                        if self.project_controller.save_project(project):
+                            logger.info("Results saved to project successfully")
+                        else:
+                            logger.error("Failed to save results to project")
+                    else:
+                        logger.error("Could not get current project")
+                except Exception as e:
+                    logger.error(f"Error saving results: {e}")
+                    # Continuar aunque falle el guardado
+            
+            # Cambiar a la pestaña de resultados
             self.tab_widget.setCurrentIndex(3)
             
-            # Verificar que results_tab existe y tiene el método correcto
+            # Actualizar la pestaña de resultados
             if hasattr(self, 'results_tab') and hasattr(self.results_tab, 'update_with_results'):
                 self.results_tab.update_with_results(results)
-                self.statusBar.showMessage(f"Executed {len(results)} methods successfully")
+                
+                # Actualizar status bar
+                methods_str = ", ".join(results.keys())
+                self.statusBar.showMessage(f"Executed: {methods_str}")
             else:
                 logger.error("Results tab not properly initialized")
-                QMessageBox.critical(self, "Error", "Results tab is not properly initialized")
+                QMessageBox.critical(
+                    self, 
+                    "Error", 
+                    "Results tab is not properly initialized.\n"
+                    "Please restart the application."
+                )
                 
         except Exception as e:
             logger.error(f"Error updating results: {str(e)}")
-            QMessageBox.critical(self, "Error", f"Failed to display results: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            QMessageBox.critical(
+                self, 
+                "Error", 
+                f"Failed to display results:\n{str(e)}\n\n"
+                "Results may have been saved but cannot be displayed."
+            )
             self.statusBar.showMessage("Error displaying results")
 
     def _has_matrix_data(self):

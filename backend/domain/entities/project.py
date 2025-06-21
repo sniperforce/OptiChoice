@@ -175,8 +175,9 @@ class Project:
         if not self.alternatives or not self.criteria:
             raise ValueError("Cannot create matrix without alternatives and criteria")
         
-        # CORRECCIÓN: Crear matriz sin necesidad de nombre
+        # CORRECCIÓN: Incluir nombre en la creación de la matriz
         self._decision_matrix = DecisionMatrix(
+            name=f"{self.name} - Decision Matrix", 
             alternatives=list(self.alternatives),
             criteria=list(self.criteria)
         )

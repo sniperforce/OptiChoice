@@ -67,11 +67,11 @@ class DecisionMatrix:
                 return idx, alt
         raise ValueError(f"Dont find any alternative with ID: {alternative_id}")
     
-    def get_criteria_by_id(self, criteria_id: int) ->  Tuple[int, Criteria]:
+    def get_criteria_by_id(self, criteria_id: str) -> Tuple[int, Criteria]:  # Cambiar int a str
         for idx, ct in enumerate(self._criteria):
-            if ct.id == criteria_id:
+            if str(ct.id) == str(criteria_id):  # Convertir ambos a string para comparación
                 return idx, ct
-        raise ValueError(f"Dont find any criteria with ID: {criteria_id}")
+        raise ValueError(f"Don't find any criteria with ID: {criteria_id}")
     
     def add_alternative(self, alternative: Alternative, values: Optional[List[float]] = None) -> None:
         if values is not None and len(values) != len(self._criteria):

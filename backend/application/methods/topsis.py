@@ -40,17 +40,16 @@ class TOPSISMethod(MCDMMethodInterface):
         return True
     
     def execute(self, decision_matrix: DecisionMatrix, 
-            parameters: Optional[Dict[str, Any]] = None) -> Result:
+        parameters: Optional[Dict[str, Any]] = None) -> Result:
         """Ejecutar el método TOPSIS"""
         try:
             # Preparar parámetros
             params = self._prepare_execution(decision_matrix, parameters)
             
             # Obtener datos de la matriz
-            matrix = decision_matrix.get_matrix()
-            weights = decision_matrix.get_weights()
+            matrix = decision_matrix.values
             criteria = decision_matrix.criteria
-            alternatives = decision_matrix.alternatives
+            alternatives = decision_matrix.alternative
             
             # Validaciones exhaustivas
             if matrix.size == 0:
@@ -81,7 +80,9 @@ class TOPSISMethod(MCDMMethodInterface):
             if np.any(np.isinf(matrix)):
                 raise MethodError("Matrix contains infinite values", self.name)
             
-            # Verificar que los pesos sean válidos
+            # Calcular y validar pesos
+            weights = np.array([c.weight for c in criteria])
+            
             if len(weights) != len(criteria):
                 raise MethodError(
                     f"Number of weights ({len(weights)}) doesn't match criteria ({len(criteria)})", 
@@ -91,9 +92,8 @@ class TOPSISMethod(MCDMMethodInterface):
             if np.sum(weights) == 0:
                 raise MethodError("Sum of weights is zero", self.name)
             
-            # Normalizar pesos si no suman 1
-            if not np.isclose(np.sum(weights), 1.0):
-                weights = weights / np.sum(weights)
+            # Normalizar pesos para que sumen 1
+            weights = weights / np.sum(weights)
             
             # Log para debugging
             print(f"TOPSIS - Matrix shape: {matrix.shape}")

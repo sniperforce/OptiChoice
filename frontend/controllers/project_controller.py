@@ -358,23 +358,25 @@ class ProjectController:
             min_weight, max_weight, steps
         )
     
-    def save_method_results(self, results_data: Dict[str, Dict]) -> bool:
-        """Guardar resultados de métodos MCDM en el proyecto"""
-        if not self.current_project_id:
-            logger.error("No current project to save results")
-            return False
-        
+    def save_method_results(self, results: Dict[str, Dict]) -> bool:
+        """Save method results to current project"""
         try:
-            # Obtener el proyecto actual
+            if not self.current_project_id:
+                logger.error("No current project to save results")
+                return False
+            
+            # Obtener proyecto actual
             project = self.get_current_project()
             if not project:
                 return False
             
-            # Agregar los resultados al proyecto
-            project['method_results'] = results_data
+            # Actualizar resultados
+            existing_results = project.get('method_results', {})
+            existing_results.update(results)
+            project['method_results'] = existing_results
             
-            # Guardar el proyecto actualizado
-            return self.api_client.update_project(self.current_project_id, project)
+            # Guardar proyecto
+            return self.save_project(project)
             
         except Exception as e:
             logger.error(f"Error saving method results: {e}")

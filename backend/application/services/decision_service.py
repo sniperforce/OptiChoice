@@ -47,7 +47,7 @@ class DecisionService:
                 )
             
             # Validar que la matriz tenga datos
-            matrix = project.decision_matrix.get_matrix()
+            matrix = project.decision_matrix.values
             if matrix.size == 0:
                 raise ServiceError(
                     message="The decision matrix is empty - no values to process",
@@ -55,7 +55,7 @@ class DecisionService:
                 )
             
             # Validar alternativas y criterios
-            if len(project.decision_matrix.alternatives) == 0:
+            if len(project.decision_matrix.alternative) == 0:
                 raise ServiceError(
                     message="No alternatives defined in the project",
                     service_name="DecisionService"

@@ -338,44 +338,52 @@ class MainController:
             raise ValueError(f"Alternative {alternative_id} or criteria {criteria_id} not found")
 
     
-    def save_decision_matrix(self, matrix_data: Dict[str, str], criteria_config: Dict[str, Dict]) -> bool:
-        """Save decision matrix data and configuration"""
-        if self._current_project is None:
-            return False
-        
+    def save_decision_matrix(self, matrix_data: Dict[str, Any]) -> bool:
         try:
-            # Asegurar que la matriz existe
+            if self._current_project is None:
+                print("No current project to save matrix")
+                return False
+            
+            # Crear matriz si no existe
             if self._current_project.decision_matrix is None:
-                # Solo crear si hay alternativas y criterios
-                if not self._current_project.alternatives or not self._current_project.criteria:
-                    print("Cannot create matrix without alternatives and criteria")
-                    return False
+                print("Creating new decision matrix")
                 self._current_project.create_decision_matrix()
             
-            # Guardar configuración de criterios
-            self._current_project.set_metadata('criteria_config', criteria_config)
-            
-            # Guardar valores de la matriz
             matrix = self._current_project.decision_matrix
             
-            # Procesar todos los valores
-            for alt in self._current_project.alternatives:
-                for crit in self._current_project.criteria:
-                    key = f"{alt.id}_{crit.id}"
-                    value = matrix_data.get(key, "")
-                    
+            # Procesar valores de la matriz
+            if 'values' in matrix_data:
+                for key, value in matrix_data['values'].items():
                     try:
-                        # Convertir a float, usar 0 si está vacío
-                        float_value = float(value) if value and value.strip() else 0.0
+                        # Parse key format: "alt_X_crit_Y"
+                        parts = key.split('_')
+                        if len(parts) != 4 or parts[0] != 'alt' or parts[2] != 'crit':
+                            continue
+                        
+                        alt_id = parts[1]
+                        crit_id = parts[3]  # Mantener como string
+                        
+                        # Encontrar alternativa y criterio
+                        alt = next((a for a in self._current_project.alternatives if a.id == alt_id), None)
+                        crit = next((c for c in self._current_project.criteria if str(c.id) == crit_id), None)
+                        
+                        if alt is None or crit is None:
+                            print(f"Warning: Alternative {alt_id} or criteria {crit_id} not found")
+                            continue
+                        
+                        # Convertir valor a float
+                        try:
+                            float_value = float(value) if value not in [None, ''] else 0.0
+                        except (ValueError, TypeError):
+                            float_value = 0.0
                         
                         # Obtener índices usando los métodos correctos de la matriz
                         try:
                             alt_idx, _ = matrix.get_alternative_by_id(alt.id)
-                            crit_idx, _ = matrix.get_criteria_by_id(crit.id)
+                            crit_idx, _ = matrix.get_criteria_by_id(str(crit.id))  # Asegurar string
                             matrix.set_values(alt_idx, crit_idx, float_value)
-                        except ValueError:
-                            # Si no se encuentra la alternativa o criterio, continuar
-                            print(f"Warning: Alternative {alt.id} or criteria {crit.id} not found in matrix")
+                        except ValueError as e:
+                            print(f"Warning: {e}")
                             continue
                             
                     except (ValueError, TypeError) as e:
@@ -414,17 +422,17 @@ class MainController:
         if self._current_project is None:
             raise ValueError("There is no current project")
         
+        matrix = self._current_project.decision_matrix
         # Validar que exista una matriz de decisión
-        if self._current_project.decision_matrix is None:
+        if matrix is None:
             raise ValueError("The project has no decision matrix configured")
         
         # Validar que la matriz tenga datos
-        matrix = self._current_project.decision_matrix
-        if matrix.get_matrix().size == 0:
+        if matrix.values.size == 0:
             raise ValueError("The decision matrix is empty")
         
         # Validar que haya alternativas y criterios
-        if len(matrix.alternatives) == 0:
+        if len(matrix.alternative) == 0:
             raise ValueError("No alternatives defined in the decision matrix")
         
         if len(matrix.criteria) == 0:
@@ -445,9 +453,9 @@ class MainController:
             
             # Agregar información adicional para debugging
             formatted_result['matrix_info'] = {
-                'n_alternatives': len(matrix.alternatives),
+                'n_alternatives': len(matrix.alternative),
                 'n_criteria': len(matrix.criteria),
-                'has_values': matrix.get_matrix().size > 0
+                'has_values': matrix.values.size > 0
             }
             
             return formatted_result

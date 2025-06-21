@@ -472,6 +472,18 @@ class ResultsTab(QWidget):
         
         parent_layout.addWidget(header_frame)
     
+    def showEvent(self, event):
+        """Handle when tab becomes visible"""
+        super().showEvent(event)
+        
+        # Auto-cargar resultados si no hay ninguno en memoria
+        if not self.results_data:
+            logger.info("Results tab shown - attempting to load saved results")
+            self.load_results()
+        
+        # Actualizar visualización siempre
+        self.update_display()
+
     def create_summary_section(self, parent_layout):
         """Crear sección de resumen"""
         summary_frame = QFrame()
