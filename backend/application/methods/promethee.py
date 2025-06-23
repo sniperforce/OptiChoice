@@ -74,7 +74,7 @@ class PROMETHEEMethod(MCDMMethodInterface):
             
             # s parameters (gaussian) by criterion
             's_thresholds': None,
-            'normalization_method': 'minimax',
+            'normalization_method': 'minmax',
             'normalize_matrix': True
         }
     
@@ -120,7 +120,7 @@ class PROMETHEEMethod(MCDMMethodInterface):
                     return False
 
         if 'normalization_method' in parameters:
-            if parameters['normalization_method'] not in ['minimax', 'sum', 'max', 'vector']:
+            if parameters['normalization_method'] not in ['minmax', 'sum', 'max', 'vector']:
                 return False
 
         if 'normalize_matrix' in parameters:
@@ -149,16 +149,19 @@ class PROMETHEEMethod(MCDMMethodInterface):
 
             alternatives = decision_matrix.alternative
             criteria = decision_matrix.criteria
-            values = decision_matrix.values.copy()
+            values = decision_matrix.values
 
             n_alternatives = len(alternatives)
             n_criteria = len(criteria)
 
             if params.get('normalize_matrix', True):
+                criteria_types = ['minimize' if crit.optimization_type.value == 'minimize' else 'maximize' 
+                  for crit in criteria]
+
                 values = normalize_matrix(
-                    values=values,
-                    criteria=criteria,
-                    method=params.get('normalization_method', 'minmax')
+                    values,
+                    method=params.get('normalization_method', 'minmax'),
+                    criteria_types=criteria_types
                 )
 
             weights = np.array([crit.weight for crit in criteria])

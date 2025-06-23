@@ -137,9 +137,9 @@ class TOPSISMethod(MCDMMethodInterface):
             # Crear resultado
             result = Result(
                 method_name=self.name,
-                alternatives=alternatives,
+                alternative_ids=[alt.id for alt in alternatives],
+                alternative_names=[alt.name for alt in alternatives],
                 scores=scores,
-                rankings=rankings,
                 parameters=params
             )
             

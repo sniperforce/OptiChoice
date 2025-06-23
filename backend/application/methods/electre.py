@@ -57,7 +57,7 @@ class ELECTREMethod(MCDMMethodInterface):
             'variant': 'I',
             'concordance_threshold': 0.7, # between 0.5 and 1.0
             'discordance_threshold': 0.3, # between 0.0 and 1.0
-            'normalization_method': 'minimax',
+            'normalization_method': 'minmax',
             'normalize_matrix': True,
             'preference_threshold': None,   # For ELECTRE III: preference thresholds by criterian (indifference < preference)
             'indifference_threshold': None, # For ELECTRE III: indifference thresholds by criterion
@@ -88,7 +88,7 @@ class ELECTREMethod(MCDMMethodInterface):
             
         if 'normalization_method' in parameters:
             method = parameters['normalization_method']
-            if method not in ['minimax', 'sum', 'max', 'vector']:
+            if method not in ['minmax', 'sum', 'max', 'vector']:
                 return False
         
         if 'normalize_matrix' in parameters:
@@ -136,16 +136,19 @@ class ELECTREMethod(MCDMMethodInterface):
 
             alternatives = decision_matrix.alternative
             criteria = decision_matrix.criteria
-            values = decision_matrix.values.copy()
+            values = decision_matrix.values
 
             n_alternatives = len(alternatives)
             n_criteria = len(criteria)
 
             if params.get('normalize_matrix', True):
+                criteria_types = ['minimize' if crit.optimization_type.value == 'minimize' else 'maximize' 
+                  for crit in criteria]
+
                 values = normalize_matrix(
-                    values=values,
-                    criteria=criteria,
-                    method=params.get('normalization_method', 'minmax')
+                    values,
+                    method=params.get('normalization_method', 'minmax'),
+                    criteria_types=criteria_types
                 )
             
             # Get criteria weights and normalize them

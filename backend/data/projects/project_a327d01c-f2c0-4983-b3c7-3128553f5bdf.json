@@ -4,7 +4,7 @@
   "description": "asdoivzoibc",
   "decision_maker": "Diego",
   "created_at": "2025-06-20T12:41:10.843711",
-  "updated_at": "2025-06-20T13:29:48.206195",
+  "updated_at": "2025-06-23T10:43:37.144301",
   "alternatives": [
     {
       "id": "A1",
@@ -59,7 +59,265 @@
       }
     }
   },
-  "results": {},
+  "results": {
+    "TOPSIS": {
+      "method_name": "TOPSIS",
+      "alternative_ids": [
+        "A1",
+        "A2"
+      ],
+      "alternative_names": [
+        "reger",
+        "zcbzcb"
+      ],
+      "scores": [
+        1.0,
+        0.0
+      ],
+      "rankings": [
+        1,
+        2
+      ],
+      "execution_time": 0.0,
+      "parameters": {
+        "normalization_method": "minmax",
+        "ideal_solution": "auto",
+        "nadir_solution": "auto"
+      },
+      "created_at": "2025-06-23T10:43:37.144248",
+      "metadata": {
+        "normalized_matrix": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            1.0,
+            0.0
+          ]
+        ],
+        "weighted_matrix": [
+          [
+            0.0,
+            0.5
+          ],
+          [
+            0.5,
+            0.0
+          ]
+        ],
+        "ideal_positive": [
+          0.0,
+          0.5
+        ],
+        "ideal_negative": [
+          0.5,
+          0.0
+        ],
+        "distances_positive": [
+          0.0,
+          0.7071067811865476
+        ],
+        "distances_negative": [
+          0.7071067811865476,
+          0.0
+        ],
+        "execution_time": 0.0014345645904541016
+      }
+    },
+    "AHP": {
+      "method_name": "AHP",
+      "alternative_ids": [
+        "A1",
+        "A2"
+      ],
+      "alternative_names": [
+        "reger",
+        "zcbzcb"
+      ],
+      "scores": [
+        0.5,
+        0.5
+      ],
+      "rankings": [
+        1,
+        1
+      ],
+      "execution_time": 0.0,
+      "parameters": {
+        "criteria_comparison_matrix": null,
+        "alternatives_comparison_matrices": null,
+        "consistency_ratio_threshold": 0.1,
+        "weight_calculation_method": "eigenvector",
+        "use_pairwise_comparison_for_alternatives": true,
+        "show_consistency_details": true,
+        "normalize_before_comparison": true,
+        "normalization_method": "minmax"
+      },
+      "created_at": "2025-06-21T00:51:24.339020",
+      "metadata": {
+        "criteria_weights": [
+          0.5,
+          0.5
+        ],
+        "alternative_priorities": [
+          [
+            0.5,
+            0.5
+          ],
+          [
+            0.5,
+            0.5
+          ]
+        ],
+        "consistency_info": {
+          "criteria_consistency": {
+            "consistency_index": 0.0,
+            "consistency_ratio": 0.0,
+            "is_consistent": true,
+            "max_eigenvalue": 2,
+            "method": "weights_derived"
+          },
+          "alternatives_consistency": [
+            {
+              "criterion_name": "zcbzcb",
+              "criterion_id": "C1",
+              "consistency_index": 0.0,
+              "consistency_ratio": 0.0,
+              "is_consistent": true,
+              "max_eigenvalue": 2.0,
+              "method": "eigenvector"
+            },
+            {
+              "criterion_name": "zcbzvn",
+              "criterion_id": "C2",
+              "consistency_index": 0.0,
+              "consistency_ratio": 0.0,
+              "is_consistent": true,
+              "max_eigenvalue": 2.0,
+              "method": "eigenvector"
+            }
+          ]
+        },
+        "execution_time": 0.0007956027984619141
+      }
+    },
+    "ELECTRE": {
+      "method_name": "ELECTRE-I",
+      "alternative_ids": [
+        "A1",
+        "A2"
+      ],
+      "alternative_names": [
+        "reger",
+        "zcbzcb"
+      ],
+      "scores": [
+        1.0,
+        -1.0
+      ],
+      "rankings": [
+        1,
+        2
+      ],
+      "execution_time": 0.0,
+      "parameters": {
+        "variant": "I",
+        "concordance_threshold": 0.7,
+        "discordance_threshold": 0.3,
+        "normalization_method": "minmax",
+        "normalize_matrix": true,
+        "preference_threshold": null,
+        "indifference_threshold": null,
+        "veto_thresholds": null,
+        "scoring_method": "net_flow",
+        "dominance_weight": 0.6
+      },
+      "created_at": "2025-06-21T00:51:26.606865",
+      "metadata": {
+        "outranking_matrix": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "dominance_matrix": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "non_dominated_alternatives": [
+          0
+        ],
+        "execution_time": 0.0003726482391357422
+      }
+    },
+    "PROMETHEE": {
+      "method_name": "PROMETHEE-II",
+      "alternative_ids": [
+        "A1",
+        "A2"
+      ],
+      "alternative_names": [
+        "reger",
+        "zcbzcb"
+      ],
+      "scores": [
+        0.0,
+        0.0
+      ],
+      "rankings": [
+        1,
+        1
+      ],
+      "execution_time": 0.0,
+      "parameters": {
+        "variant": "II",
+        "default_preference_function": "v-shape",
+        "preference_functions": null,
+        "p_thresholds": null,
+        "q_thresholds": null,
+        "s_thresholds": null,
+        "normalization_method": "minmax",
+        "normalize_matrix": true
+      },
+      "created_at": "2025-06-21T00:51:28.834240",
+      "metadata": {
+        "positive_flow": [
+          0.5,
+          0.5
+        ],
+        "negative_flow": [
+          0.5,
+          0.5
+        ],
+        "net_flow": [
+          0.0,
+          0.0
+        ],
+        "preference_matrix": [
+          [
+            0.0,
+            0.5
+          ],
+          [
+            0.5,
+            0.0
+          ]
+        ],
+        "execution_time": 0.0002887248992919922
+      }
+    }
+  },
   "decision_matrix": {
     "name": "Decision Matrix",
     "alternatives": [

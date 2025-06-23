@@ -106,10 +106,13 @@ class DecisionMatrix:
         self._values = np.delete(self._values, criteria_idx, axis=1)
     
     def normalize(self, method: str = 'minimax') -> 'DecisionMatrix':
+        criteria_types = ['minimize' if crit.optimization_type.value == 'minimize' else 'maximize' 
+                  for crit in self._criteria]
+
         normalized_values = normalize_matrix(
-            values=self._values,
-            criteria=self._criteria,
-            method=method
+            self._values,  # Primer parámetro posicional
+            method=method,
+            criteria_types=criteria_types
         )
 
         return DecisionMatrix(

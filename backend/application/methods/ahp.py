@@ -97,7 +97,7 @@ class AHPMethod(MCDMMethodInterface):
             'normalize_before_comparison': True,
 
             # Normalization method ('minimax', 'sum', 'max', 'vector')
-            'normalization_method': 'minimax'
+            'normalization_method': 'minmax'
         }
     
     def validate_parameters(self, parameters: Dict[str, Any]) -> bool:
@@ -190,7 +190,7 @@ class AHPMethod(MCDMMethodInterface):
                     consistency_info['alternatives_consistency'] = alt_consistency
             else:
                 # Use decision matrix values directly
-                alternative_priorities = values.copy()
+                alternative_priorities = values
             
             # Step 3: Calculate global scores
             scores = np.zeros(n_alternatives)
@@ -302,10 +302,13 @@ class AHPMethod(MCDMMethodInterface):
             
             # Normalize values if requested
             if params.get('normalize_before_comparison', True):
+                criteria_types = ['minimize' if crit.optimization_type.value == 'minimize' else 'maximize' 
+                  for crit in criteria]
+
                 values = normalize_matrix(
-                    values=values,
-                    criteria=criteria,
-                    method=params.get('normalization_method', 'minmax')
+                    values,
+                    method=params.get('normalization_method', 'minmax'),
+                    criteria_types=criteria_types
                 )
             
             # For each criteria, create a comparition matrix  between alternatives
