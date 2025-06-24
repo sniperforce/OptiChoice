@@ -1451,7 +1451,7 @@ class MatrixTab(QWidget):
             return
         
         total_cells = self.matrix_table.rowCount() * self.matrix_table.columnCount()
-        filled_cells = sum(1 for value in self.matrix_data.values() if value.strip())
+        filled_cells = sum(1 for key, value in self.matrix_data['values'].items() if value.strip())
         
         completeness = int((filled_cells / total_cells) * 100) if total_cells > 0 else 0
         

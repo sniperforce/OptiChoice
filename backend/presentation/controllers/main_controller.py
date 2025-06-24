@@ -338,7 +338,18 @@ class MainController:
             raise ValueError(f"Alternative {alternative_id} or criteria {criteria_id} not found")
 
     
-    def save_decision_matrix(self, matrix_data: Dict[str, Any]) -> bool:
+    def save_decision_matrix(self, matrix_data: Dict[str, Any], input_config: Dict[str, Any] = None) -> bool:
+        """
+        Save decision matrix values and input configuration
+        
+        Args:
+            matrix_data: Dictionary with matrix values
+            input_config: Dictionary with input configuration for each criterion
+                        (scale types, ranges, formats - NOT fundamental properties)
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
         try:
             if self._current_project is None:
                 print("No current project to save matrix")
@@ -352,7 +363,7 @@ class MainController:
             matrix = self._current_project.decision_matrix
             
             # Procesar valores de la matriz
-            if 'values' in matrix_data:
+            if matrix_data and 'values' in matrix_data:
                 for key, value in matrix_data['values'].items():
                     try:
                         # Parse key format: "alt_X_crit_Y"
@@ -361,7 +372,7 @@ class MainController:
                             continue
                         
                         alt_id = parts[1]
-                        crit_id = parts[3]  # Mantener como string
+                        crit_id = parts[3]
                         
                         # Encontrar alternativa y criterio
                         alt = next((a for a in self._current_project.alternatives if a.id == alt_id), None)
@@ -377,10 +388,21 @@ class MainController:
                         except (ValueError, TypeError):
                             float_value = 0.0
                         
-                        # Obtener índices usando los métodos correctos de la matriz
+                        # Validar valor según configuración de entrada (si existe)
+                        if input_config and crit_id in input_config:
+                            config = input_config[crit_id]
+                            min_val = float(config.get('min_value', -float('inf')))
+                            max_val = float(config.get('max_value', float('inf')))
+                            
+                            if float_value < min_val or float_value > max_val:
+                                print(f"Warning: Value {float_value} for {crit_id} is outside configured range [{min_val}, {max_val}]")
+                                # Podríamos rechazar el valor o ajustarlo
+                                # float_value = max(min_val, min(max_val, float_value))
+                        
+                        # Obtener índices y establecer valor
                         try:
                             alt_idx, _ = matrix.get_alternative_by_id(alt.id)
-                            crit_idx, _ = matrix.get_criteria_by_id(str(crit.id))  # Asegurar string
+                            crit_idx, _ = matrix.get_criteria_by_id(str(crit.id))
                             matrix.set_values(alt_idx, crit_idx, float_value)
                         except ValueError as e:
                             print(f"Warning: {e}")
@@ -390,10 +412,21 @@ class MainController:
                         print(f"Error setting value for {key}: {e}")
                         continue
             
+            # Guardar configuración de entrada en metadata del proyecto
+            if input_config:
+                # Guardar la configuración de entrada en metadata del proyecto
+                # para que pueda ser recuperada al cargar el proyecto
+                project_metadata = self._current_project.metadata.copy()
+                project_metadata['matrix_input_config'] = input_config
+                self._current_project._metadata = project_metadata
+                
+                # Log para debug
+                print(f"Saved input configuration for {len(input_config)} criteria")
+            
             # Marcar proyecto como modificado
             self._current_project._updated_at = datetime.now()
             
-            # Guardar inmediatamente
+            # Guardar proyecto
             self.save_project()
             
             return True
@@ -404,6 +437,19 @@ class MainController:
             traceback.print_exc()
             return False
     
+    def get_matrix_input_config(self) -> Dict[str, Any]:
+        """
+        Get the saved input configuration for the decision matrix
+        
+        Returns:
+            Dictionary with input configuration for each criterion
+        """
+        if self._current_project is None:
+            return {}
+        
+        # Recuperar configuración desde metadata del proyecto
+        return self._current_project.metadata.get('matrix_input_config', {})
+
     def get_available_methods(self) -> List[Dict[str, Any]]:
         method_names = self._decision_service.get_available_methods()
         
