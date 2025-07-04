@@ -338,14 +338,13 @@ class MainController:
             raise ValueError(f"Alternative {alternative_id} or criteria {criteria_id} not found")
 
     
-    def save_decision_matrix(self, matrix_data: Dict[str, Any], input_config: Dict[str, Any] = None) -> bool:
+    def save_decision_matrix(self, matrix_data: Dict[str, Any], criteria_config: Dict[str, Any] = None) -> bool:
         """
         Save decision matrix values and input configuration
         
         Args:
             matrix_data: Dictionary with matrix values
-            input_config: Dictionary with input configuration for each criterion
-                        (scale types, ranges, formats - NOT fundamental properties)
+            criteria_config: Dictionary with input configuration for each criterion
         
         Returns:
             bool: True if successful, False otherwise
@@ -362,66 +361,57 @@ class MainController:
             
             matrix = self._current_project.decision_matrix
             
+            # CORRECCIÓN: Manejar ambos formatos de datos
+            matrix_values = {}
+            
+            # Si matrix_data tiene la clave 'values', usar eso
+            if isinstance(matrix_data, dict) and 'values' in matrix_data:
+                matrix_values = matrix_data['values']
+            # Si no, asumir que matrix_data contiene directamente los valores
+            elif isinstance(matrix_data, dict):
+                matrix_values = matrix_data
+            
             # Procesar valores de la matriz
-            if matrix_data and 'values' in matrix_data:
-                for key, value in matrix_data['values'].items():
-                    try:
-                        # Parse key format: "alt_X_crit_Y"
+            for key, value in matrix_values.items():
+                try:
+                    # CORRECCIÓN: Manejar ambos formatos de clave
+                    if '_' in key and key.count('_') >= 1:
                         parts = key.split('_')
-                        if len(parts) != 4 or parts[0] != 'alt' or parts[2] != 'crit':
-                            continue
                         
-                        alt_id = parts[1]
-                        crit_id = parts[3]
-                        
-                        # Encontrar alternativa y criterio
-                        alt = next((a for a in self._current_project.alternatives if a.id == alt_id), None)
-                        crit = next((c for c in self._current_project.criteria if str(c.id) == crit_id), None)
-                        
-                        if alt is None or crit is None:
-                            print(f"Warning: Alternative {alt_id} or criteria {crit_id} not found")
+                        # Formato "alt_X_crit_Y"
+                        if len(parts) == 4 and parts[0] == 'alt' and parts[2] == 'crit':
+                            alt_id = parts[1]
+                            crit_id = parts[3]
+                        # Formato "X_Y"
+                        elif len(parts) == 2:
+                            alt_id = parts[0]
+                            crit_id = parts[1]
+                        else:
+                            print(f"Invalid key format: {key}")
                             continue
                         
                         # Convertir valor a float
                         try:
-                            float_value = float(value) if value not in [None, ''] else 0.0
+                            float_value = float(value) if value != '' else 0.0
                         except (ValueError, TypeError):
                             float_value = 0.0
                         
-                        # Validar valor según configuración de entrada (si existe)
-                        if input_config and crit_id in input_config:
-                            config = input_config[crit_id]
-                            min_val = float(config.get('min_value', -float('inf')))
-                            max_val = float(config.get('max_value', float('inf')))
-                            
-                            if float_value < min_val or float_value > max_val:
-                                print(f"Warning: Value {float_value} for {crit_id} is outside configured range [{min_val}, {max_val}]")
-                                # Podríamos rechazar el valor o ajustarlo
-                                # float_value = max(min_val, min(max_val, float_value))
+                        # Establecer valor en la matriz
+                        self.set_matrix_value(alt_id, crit_id, float_value)
                         
-                        # Obtener índices y establecer valor
-                        try:
-                            alt_idx, _ = matrix.get_alternative_by_id(alt.id)
-                            crit_idx, _ = matrix.get_criteria_by_id(str(crit.id))
-                            matrix.set_values(alt_idx, crit_idx, float_value)
-                        except ValueError as e:
-                            print(f"Warning: {e}")
-                            continue
-                            
-                    except (ValueError, TypeError) as e:
-                        print(f"Error setting value for {key}: {e}")
-                        continue
+                except Exception as e:
+                    print(f"Error processing matrix value for key {key}: {str(e)}")
+                    continue
             
-            # Guardar configuración de entrada en metadata del proyecto
-            if input_config:
+            # Guardar configuración de entrada si se proporciona
+            if criteria_config:
                 # Guardar la configuración de entrada en metadata del proyecto
-                # para que pueda ser recuperada al cargar el proyecto
                 project_metadata = self._current_project.metadata.copy()
-                project_metadata['matrix_input_config'] = input_config
+                project_metadata['matrix_input_config'] = criteria_config
                 self._current_project._metadata = project_metadata
                 
                 # Log para debug
-                print(f"Saved input configuration for {len(input_config)} criteria")
+                print(f"Saved input configuration for {len(criteria_config)} criteria")
             
             # Marcar proyecto como modificado
             self._current_project._updated_at = datetime.now()

@@ -680,50 +680,50 @@ class MatrixTab(QWidget):
     # === MÉTODOS PRINCIPALES MEJORADOS ===
     
     def load_matrix_data(self):
-        """Load matrix data with proper state management - CORRECTED"""
-        if not self.state_manager.can_proceed('load'):
-            logger.debug("Cannot proceed with load - operation locked")
-            return
-        
-        self.state_manager.lock('load')
-        
+        """Load matrix data from the project"""
         try:
-            if not self.project_controller.current_project_id:
-                self._handle_no_project()
+            logger.info("Loading matrix data...")
+            
+            # Obtener datos de la matriz
+            matrix_data = self.project_controller.get_decision_matrix()
+            
+            if not matrix_data:
+                logger.warning("No matrix data found")
                 return
             
-            project = self.project_controller.get_current_project()
-            if not project:
-                self._handle_no_project()
-                return
+            # CORRECCIÓN: Manejar el formato correcto de datos
+            if 'matrix_data' in matrix_data and isinstance(matrix_data['matrix_data'], dict):
+                # Los valores vienen directamente en matrix_data
+                values = matrix_data['matrix_data']
+            else:
+                values = {}
             
-            # Update project info
-            project_name = project.get('name', 'Unknown')
-            self.project_label.setText(f"Project: {project_name}")
-            self.project_label.setStyleSheet("color: #2e7d32; font-weight: bold;")
+            # Cargar configuración de criterios
+            if 'criteria_config' in matrix_data:
+                self.criteria_config = matrix_data['criteria_config']
             
-            # IMPORTANTE: No establecer is_programmatic_update aquí para permitir
-            # que _update_table_values funcione correctamente
+            # Actualizar la tabla con los valores
+            for row in range(self.matrix_table.rowCount()):
+                for col in range(self.matrix_table.columnCount()):
+                    item = self.matrix_table.item(row, col)
+                    if item:
+                        data = item.data(Qt.UserRole)
+                        if data:
+                            # Buscar el valor usando formato simple
+                            key = f"{data['alt_id']}_{data['crit_id']}"
+                            
+                            if key in values:
+                                value = str(values[key])
+                                item.setText(value)
+                                self.matrix_data[key] = value
             
-            # Load alternatives and criteria
-            self._load_project_structure()
+            logger.info(f"Loaded {len(values)} matrix values")
+            self.pending_changes.clear()
             
-            # Load saved matrix data (esto llama a _update_table_values internamente)
-            self._load_saved_matrix_data()
-            
-            # Update UI
-            self.update_completeness()
-            
-            # Run initial validation if enabled
-            if VALIDATION_AVAILABLE and hasattr(self, 'validation_panel'):
-                if self.validation_panel.is_auto_validate_enabled():
-                    self.timer_coordinator.schedule('validation', self.run_validation_auto, 500)
-                    
         except Exception as e:
             logger.error(f"Error loading matrix data: {e}")
-            QMessageBox.critical(self, "Error", f"Failed to load matrix data: {str(e)}")
-        finally:
-            self.state_manager.unlock('load')
+            import traceback
+            traceback.print_exc()
     
     def _handle_no_project(self):
         """Handle the case when no project is loaded"""
@@ -783,7 +783,7 @@ class MatrixTab(QWidget):
             if saved_data:
                 # Cargar datos de la matriz
                 self.matrix_data = saved_data.get('matrix_data', {})
-                saved_config = saved_data.get('criteria_config', {})
+                saved_config = saved_data.get('input_config', {})
                 
                 logger.info(f"Loading saved config: {saved_config}")
                 
@@ -1064,68 +1064,58 @@ class MatrixTab(QWidget):
 
     
     def save_matrix(self, show_success=True):
-        """Save matrix data with complete structure - FIXED"""
-        if not self.project_controller.current_project_id:
-            if show_success:
-                QMessageBox.warning(self, "Warning", "No project loaded")
-            return False
-        
-        if not self.state_manager.can_proceed('save'):
-            logger.warning("Save operation already in progress")
-            return False
-        
-        self.state_manager.lock('save')
-        
+        """Save current matrix values and configuration"""
         try:
-            # Obtener alternativas y criterios actuales
+            logger.info("Starting matrix save process")
+            
+            # Obtener datos actuales
             alternatives = self.project_controller.get_alternatives()
             criteria = self.project_controller.get_criteria()
             
             if not alternatives or not criteria:
                 if show_success:
-                    QMessageBox.warning(self, "Warning", "No alternatives or criteria defined")
+                    QMessageBox.warning(self, "Warning", 
+                                    "Please add alternatives and criteria before saving the matrix")
                 return False
             
-            # Obtener configuración actual
-            current_config = self._get_current_criteria_config()
-            
-            # CORRECCIÓN: Recolectar TODOS los valores de la tabla
+            # CORRECCIÓN: Asegurar formato consistente de claves
             complete_matrix_data = {}
+            
+            # Recolectar todos los valores de la tabla
             for row in range(self.matrix_table.rowCount()):
                 for col in range(self.matrix_table.columnCount()):
                     item = self.matrix_table.item(row, col)
                     if item:
                         data = item.data(Qt.UserRole)
                         if data:
+                            # Usar formato simple "id_id"
                             key = f"{data['alt_id']}_{data['crit_id']}"
                             value = item.text().strip()
                             complete_matrix_data[key] = value
             
-            # CORRECCIÓN: Asegurar que todos los pares alt-crit existen
+            # Asegurar que todos los pares alt-crit existen
             for alt in alternatives:
                 for crit in criteria:
                     key = f"{alt['id']}_{crit['id']}"
                     if key not in complete_matrix_data:
                         complete_matrix_data[key] = ""
             
-            # Actualizar matrix_data con los valores completos
+            # Actualizar matrix_data
             self.matrix_data = complete_matrix_data
             
             # Log para debug
             non_empty = sum(1 for v in self.matrix_data.values() if v)
             logger.info(f"Saving matrix with {len(self.matrix_data)} cells, {non_empty} non-empty")
             
-            # Preparar datos completos
-            complete_data = {
-                'alternatives': alternatives,
-                'criteria': criteria,
-                'matrix_data': self.matrix_data.copy(),
-                'criteria_config': current_config
-            }
+            # Recolectar configuración actual
+            current_config = {}
+            for crit in criteria:
+                crit_id = str(crit['id'])
+                if crit_id in self.criteria_config:
+                    current_config[crit_id] = self.criteria_config[crit_id]
             
-            # CORRECCIÓN: Usar save_decision_matrix directamente
-            success = self.project_controller.api_client.save_decision_matrix(
-                self.project_controller.current_project_id,
+            # CORRECCIÓN: Llamar al API con el formato correcto
+            success = self.project_controller.save_decision_matrix(
                 self.matrix_data.copy(),
                 current_config
             )
@@ -1133,7 +1123,7 @@ class MatrixTab(QWidget):
             if success:
                 self.pending_changes.clear()
                 
-                # CORRECCIÓN: Forzar actualización del proyecto
+                # Forzar actualización del proyecto
                 self.project_controller.save_current_project()
                 
                 if show_success:
@@ -1147,14 +1137,12 @@ class MatrixTab(QWidget):
                 return False
                 
         except Exception as e:
-            logger.error(f"Save error: {e}")
+            logger.error(f"Error saving matrix: {e}")
             import traceback
             traceback.print_exc()
             if show_success:
-                QMessageBox.critical(self, "Error", f"Failed to save matrix: {str(e)}")
+                QMessageBox.critical(self, "Error", f"Error saving matrix: {str(e)}")
             return False
-        finally:
-            self.state_manager.unlock('save')
     
     # === MÉTODOS DE CONFIGURACIÓN ===
     

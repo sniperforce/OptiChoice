@@ -277,7 +277,7 @@ def get_decision_matrix(project_id):
             'alternatives': controller.get_all_alternatives(),
             'criteria': controller.get_all_criteria(),
             'matrix_data': {},
-            'criteria_config': controller.get_matrix_input_config()  # Configuración de entrada
+            'criteria_config': controller.get_matrix_input_config()
         }
         
         # Si existe matriz, obtener valores
@@ -287,14 +287,16 @@ def get_decision_matrix(project_id):
             
             for i, alt in enumerate(project.alternatives):
                 for j, crit in enumerate(project.criteria):
-                    key = f"alt_{alt.id}_crit_{crit.id}"
+                    # IMPORTANTE: Usar formato simple "id_id"
+                    key = f"{alt.id}_{crit.id}"
                     try:
                         value = matrix.values[i, j]
                         matrix_data[key] = float(value)
                     except:
                         matrix_data[key] = 0.0
             
-            response_data['matrix_data'] = {'values': matrix_data}
+            # NO envolver en 'values', enviar directamente
+            response_data['matrix_data'] = matrix_data
         
         return jsonify(response_data), 200
         
@@ -345,7 +347,7 @@ def save_decision_matrix(project_id):
         # Save matrix data
         success = controller.save_decision_matrix(
             data.get('matrix_data', {}),
-            data.get('input_config', {})
+            data.get('criteria_config', {})
         )
         
         if success:

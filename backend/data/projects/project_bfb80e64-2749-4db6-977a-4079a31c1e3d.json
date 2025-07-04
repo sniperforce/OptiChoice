@@ -1,0 +1,30 @@
+{
+  "id": "bfb80e64-2749-4db6-977a-4079a31c1e3d",
+  "name": "aoicbxihbz",
+  "description": "iczbzxbdab",
+  "decision_maker": "zxcbdab",
+  "created_at": "2025-07-03T23:19:23.434068",
+  "updated_at": "2025-07-03T23:19:25.480789",
+  "alternatives": [
+    {
+      "id": "A1",
+      "name": "zxcb",
+      "description": "SDAGAasd",
+      "metadata": {}
+    }
+  ],
+  "criteria": [
+    {
+      "id": "C1",
+      "name": "dasgasxzcb",
+      "description": "",
+      "optimization_type": "maximize",
+      "scale_type": "quantitative",
+      "weight": 1.0,
+      "unit": "",
+      "metadata": {}
+    }
+  ],
+  "metadata": {},
+  "results": {}
+}
